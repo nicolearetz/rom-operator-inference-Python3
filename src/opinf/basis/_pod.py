@@ -131,6 +131,27 @@ def method_of_snapshots(
     svals = np.sqrt(eigvals * n_states)
     V = states @ (eigvecs / svals)
 
+    # if basis functions are not orthonormal, apply Gram-Schmidt
+    counter = 0
+    while (
+        not np.isclose(
+            V.T @ inner_product_matrix @ V, np.eye(V.shape[1])
+        ).all()
+    ) and counter < 5:
+        V_old = V.copy()
+        for i in range(V.shape[1]):
+            v_i = V_old[:, i]
+            for j in range(i):
+                v_i = v_i - (v_i.T @ inner_product_matrix @ V[:, j]) * V[:, j]
+            norm_vi = np.sqrt(v_i.T @ inner_product_matrix @ v_i)
+            V[:, i] = v_i / norm_vi
+        counter += 1
+
+    if not np.isclose(
+        V.T @ inner_product_matrix @ V, np.eye(V.shape[1])
+    ).all():
+        raise RuntimeWarning("Computed basis functions are not orthonormal.")
+
     return V, svals, eigvecs.T
 
 
