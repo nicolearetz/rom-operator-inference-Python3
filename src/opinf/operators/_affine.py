@@ -10,6 +10,7 @@ __all__ = [
     "AffineCubicOperator",
     "AffineInputOperator",
     "AffineStateInputOperator",
+    "AffinePolynomialOperator",
 ]
 
 import h5py
@@ -27,6 +28,7 @@ from ._nonparametric import (
     InputOperator,
     StateInputOperator,
 )
+from ._polynomial_operator import PolynomialOperator
 
 
 # Helper functions ============================================================
@@ -666,6 +668,142 @@ class AffineCubicOperator(_AffineOperator):
     """
 
     _OperatorClass = CubicOperator
+
+
+class AffinePolynomialOperator(_AffineOperator):
+    # TODO: update description
+    r"""Affine-parametric cubic operator
+    :math:`\Ophat_{\ell}(\qhat,\u;\bfmu)
+    = \Ghat_{\ell}(\bfmu)[\qhat\otimes\qhat\otimes\qhat] = \left(
+    \sum_{a=0}^{A_{\ell}-1}\theta_{\ell}^{(a)}\!(\bfmu)\,\Ghat_{\ell}^{(a)}
+    \right)[\qhat\otimes\qhat\otimes\qhat].`
+
+    Here, each :math:`\theta_\ell^{(a)}:\RR^{p}\to\RR` is a scalar-valued
+    function of the parameter vector
+    and each :math:`\Ghat_{\ell}^{(a)} \in \RR^{r\times r^3}` is a constant
+    matrix, see :class:`opinf.operators.CubicOperator`.
+
+    Parameters
+    ----------
+    coeffs : callable, (iterable of callables), or int
+        Coefficient functions for the terms of the affine expansion.
+
+        * If callable, it should receive a parameter vector
+          :math:`\bfmu` and return the vector of affine coefficients,
+          :math:`[~\theta_{\ell}^{(0)}(\bfmu)
+          ~~\cdots~~\theta_{\ell}^{(A_{\ell}-1)}(\bfmu)~]\trp`.
+          In this case, ``nterms`` is a required argument.
+        * If an iterable, each entry should be a callable representing a
+          single affine coefficient function :math:`\theta_{\ell}^{(a)}`.
+        * If an integer :math:`p`, set :math:`A_{\ell} = p` and define
+          :math:`\theta_{\ell}^{(i)}\!(\bfmu) = \mu_i`. This is equivalent to
+          using ``coeffs=lambda mu: mu``, except the parameter dimension is
+          also captured and ``nterms`` is not required.
+    entries : list of ndarrays, or None
+        Operator matrices for each term of the affine expansion, i.e.,
+        :math:`\Ghat_{\ell}^{(0)},\ldots,\Ghat_{\ell}^{(A_{\ell}-1)}.`
+        If not provided in the constructor, use :meth:`set_entries` later.
+    fromblock : bool
+        If ``True``, interpret ``entries`` as a horizontal concatenation
+        of arrays; if ``False`` (default), interpret ``entries`` as a list
+        of arrays.
+    """
+
+    _OperatorClass = PolynomialOperator
+
+    def __init__(
+        self,
+        coeffs,
+        polynomial_order: int,
+        nterms: int = None,
+        entries=None,
+        fromblock: bool = False,
+    ):
+        """same as AffineOperator.__init__,
+        except the polynomial order is
+        passed as an additional input"""
+        self.polynomial_order = polynomial_order
+        super().__init__(
+            coeffs=coeffs, nterms=nterms, entries=entries, fromblock=fromblock
+        )
+
+    def operator_dimension(self, s: int, r: int, m: int) -> int:
+        r"""Number of columns in the concatenated operator matrix.
+        See AffineOperator.operator_dimension for detailed description.
+        Implementation is just slightly different because
+        PolynomialOperator.operator_dimension is not static.
+        """
+        return self.nterms * PolynomialOperator(
+            polynomial_order=self.polynomial_order
+        ).operator_dimension(r, m)
+
+    def datablock(self, parameters, states, inputs=None) -> np.ndarray:
+        r"""same as AffineOperator.datablock.
+        Implementation is just slightly different because
+        PolynomialOperator.datablock is not static.
+        """
+        if not isinstance(self, InputMixin):
+            inputs = [None] * len(parameters)
+        blockcolumns = []
+        for mu, Q, U in zip(parameters, states, inputs):
+            Di = PolynomialOperator(
+                polynomial_order=self.polynomial_order
+            ).datablock(Q, U)
+            theta_mus = self.coeffs(mu)
+            if self.nterms == 1 and np.isscalar(theta_mus):
+                theta_mus = [theta_mus]
+            blockcolumns.append(np.vstack([theta * Di for theta in theta_mus]))
+        return np.hstack(blockcolumns)
+
+    def set_entries(self, entries, fromblock: bool = False) -> None:
+        r"""same as AffineOperator.set_entries.
+        Implementation is just slightly different because
+        PolynomialOperator.datablock is not static.
+        """
+        # Extract / verify the entries.
+        nterms = self.nterms
+        if fromblock:
+            if not isinstance(entries, np.ndarray) or (
+                entries.ndim not in (1, 2)
+            ):
+                raise ValueError(
+                    "entries must be a 1- or 2-dimensional ndarray "
+                    "when fromblock=True"
+                )
+            entries = np.split(entries, nterms, axis=-1)
+        if np.ndim(entries) > 1:
+            self._check_shape_consistency(entries, "entries")
+        if (n_arrays := len(entries)) != nterms:
+            raise ValueError(
+                f"{nterms} = number of affine expansion terms "
+                f"!= len(entries) = {n_arrays}"
+            )
+
+        ParametricOpInfOperator.set_entries(
+            self,
+            [
+                PolynomialOperator(
+                    entries=A, polynomial_order=self.polynomial_order
+                ).entries
+                for A in entries
+            ],
+        )
+
+    @utils.requires("entries")
+    def evaluate(self, parameter):
+        r"""Evaluate the operator at the given parameter value.
+        Same as AffineOperator.evaluate, just implemented slightly differently.
+        """
+        if self.parameter_dimension is None:
+            self._set_parameter_dimension_from_values([parameter])
+        self._check_parametervalue_dimension(parameter)
+        theta_mus = self.coeffs(parameter)
+        if self.nterms == 1 and np.isscalar(theta_mus):
+            theta_mus = [theta_mus]
+        entries = sum([tm * A for tm, A in zip(theta_mus, self.entries)])
+        return self._OperatorClass(
+            entries=entries, polynomial_order=self.polynomial_order
+        )
 
 
 class AffineInputOperator(_AffineOperator, InputMixin):

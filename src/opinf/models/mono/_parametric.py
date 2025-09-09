@@ -22,6 +22,7 @@ from ._nonparametric import (
 )
 from ... import errors, utils, operators as _operators
 from ...operators import _utils as oputils
+from ...operators._polynomial_operator import PolynomialOperator
 
 
 # Base classes ================================================================
@@ -70,7 +71,15 @@ class _ParametricModel(_OpInfModel):
         of operation (e.g., two constant operators).
         """
         OpClasses = {
-            (op._OperatorClass if oputils.is_parametric(op) else type(op))
+            (
+                op._OperatorClass
+                if oputils.is_parametric(op)
+                else (
+                    op.polynomial_order
+                    if type(op) is PolynomialOperator
+                    else type(op)
+                )
+            )
             for op in ops
         }
         if len(OpClasses) != len(ops):
