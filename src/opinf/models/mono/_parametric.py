@@ -273,7 +273,9 @@ class _ParametricModel(_OpInfModel):
             blocks.append(block.T)
         return np.hstack(blocks)
 
-    def _fit_solver(self, parameters, states, lhs, inputs=None):
+    def _fit_solver(
+        self, parameters, states, lhs, inputs=None, initial_guess=None
+    ):
         """Construct a solver for the operator inference least-squares
         regression."""
         (
@@ -290,7 +292,12 @@ class _ParametricModel(_OpInfModel):
 
         # Set up non-intrusive learning.
         D = self._assemble_data_matrix(parameters_, states_, inputs_)
-        self.solver.fit(D, np.hstack(lhs_))
+        R = np.hstack(lhs_)
+
+        if initial_guess is not None:
+            R = R - (D @ initial_guess.T).T
+
+        self.solver.fit(D, R)
         self.__s = len(parameters_)
 
     def _extract_operators(self, Ohat):
@@ -310,7 +317,7 @@ class _ParametricModel(_OpInfModel):
                 op.set_entries(Ohat[:, index:endex])
             index = endex
 
-    def refit(self):
+    def refit(self, initial_guess=None):
         """Solve the Operator Inference regression using the data from the
         last :meth:`fit()` call, then extract the inferred operators.
 
@@ -329,10 +336,14 @@ class _ParametricModel(_OpInfModel):
             return self
 
         # Execute non-intrusive learning.
-        self._extract_operators(self.solver.solve())
+        self._Ohat = self.solver.solve()
+        if initial_guess is not None:
+            self._Ohat += initial_guess
+
+        self._extract_operators(Ohat=self._Ohat)
         return self
 
-    def fit(self, parameters, states, lhs, inputs=None):
+    def fit(self, parameters, states, lhs, inputs=None, initial_guess=None):
         r"""Learn the model operators from data.
 
         The operators are inferred by solving the regression problem
@@ -397,8 +408,10 @@ class _ParametricModel(_OpInfModel):
             )
             return self
 
-        self._fit_solver(parameters, states, lhs, inputs)
-        return self.refit()
+        self._fit_solver(
+            parameters, states, lhs, inputs, initial_guess=initial_guess
+        )
+        return self.refit(initial_guess=initial_guess)
 
     # Parametric evaluation ---------------------------------------------------
     def evaluate(self, parameter):
@@ -727,7 +740,7 @@ class _ParametricContinuousMixin:
 
     _ModelClass = _FrozenContinuousModel
 
-    def fit(self, parameters, states, ddts, inputs=None):
+    def fit(self, parameters, states, ddts, inputs=None, initial_guess=None):
         r"""Learn the model operators from data.
 
         The operators are inferred by solving the regression problem
@@ -808,7 +821,13 @@ class _ParametricContinuousMixin:
         -------
         self
         """
-        return super().fit(parameters, states, ddts, inputs=inputs)
+        return super().fit(
+            parameters,
+            states,
+            ddts,
+            inputs=inputs,
+            initial_guess=initial_guess,
+        )
 
     def rhs(self, t, parameter, state, input_func=None):
         r"""Evaluate the right-hand side of the model by applying each operator
