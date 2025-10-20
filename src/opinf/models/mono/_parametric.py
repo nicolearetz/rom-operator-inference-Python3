@@ -295,6 +295,13 @@ class _ParametricModel(_OpInfModel):
         R = np.hstack(lhs_)
 
         if initial_guess is not None:
+            if initial_guess.shape != (D.shape[1], R.shape[0]):
+                raise RuntimeError(
+                    f"""In _NonparametricModel.refit:
+                                   initial_guess was passed of shape
+                                   {initial_guess.shape}, expected
+                                   {(D.shape[1], R.shape[0])}"""
+                )
             R = R - (D @ initial_guess.T).T
 
         self.solver.fit(D, R)

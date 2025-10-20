@@ -235,7 +235,7 @@ class _NonparametricModel(_OpInfModel):
             self.operators[i].set_entries(Ohat[:, index:endex])
             index = endex
 
-    def _fit_solver(self, states, lhs, inputs=None):
+    def _fit_solver(self, states, lhs, inputs=None, initial_guess=None):
         """Construct a solver object mapping the regularizer to solutions
         of the Operator Inference least-squares problem.
         """
@@ -244,9 +244,20 @@ class _NonparametricModel(_OpInfModel):
             states, lhs, inputs
         )
         D = self._assemble_data_matrix(states_, inputs_)
+
+        if initial_guess is not None:
+            if initial_guess.shape != (D.shape[1], lhs_.shape[0]):
+                raise RuntimeError(
+                    f"""In _NonparametricModel.refit:
+                                   initial_guess was passed of shape
+                                   {initial_guess.shape}, expected
+                                   {(D.shape[1], lhs_.shape[0])}"""
+                )
+            lhs_ = lhs_ - (D @ initial_guess.T).T
+
         self.solver.fit(D, lhs_)
 
-    def refit(self):
+    def refit(self, initial_guess=None):
         """Solve the Operator Inference regression using the data from the
         last :meth:`fit()` call, then extract the inferred operators.
 
@@ -265,11 +276,20 @@ class _NonparametricModel(_OpInfModel):
             )
             return self
 
+        # # Execute non-intrusive learning.
+        # self._extract_operators(self.solver.solve()) # previous code,
+        # just keeping in case I make a mistake
+
         # Execute non-intrusive learning.
-        self._extract_operators(self.solver.solve())
+        self._Ohat = self.solver.solve()
+        if initial_guess is not None:
+            self._Ohat += initial_guess
+
+        self._extract_operators(Ohat=self._Ohat)
+
         return self
 
-    def fit(self, states, lhs, inputs=None):
+    def fit(self, states, lhs, inputs=None, initial_guess=None):
         r"""Learn the model operators from data.
 
         The operators are inferred by solving the regression problem
@@ -329,8 +349,8 @@ class _NonparametricModel(_OpInfModel):
             )
             return self
 
-        self._fit_solver(states, lhs, inputs)
-        return self.refit()
+        self._fit_solver(states, lhs, inputs, initial_guess=initial_guess)
+        return self.refit(initial_guess=initial_guess)
 
     # Model evaluation --------------------------------------------------------
     def rhs(self, state, input_=None):
@@ -503,7 +523,7 @@ class SteadyModel(_NonparametricModel):  # pragma: no cover
     _INPUT_LABEL = None
     # TODO: disallow input terms?
 
-    def fit(self, states, forcing=None):
+    def fit(self, states, forcing=None, initial_guess=None):
         r"""Learn the model operators from data.
 
         The operators are inferred by solving the regression problem
@@ -545,7 +565,9 @@ class SteadyModel(_NonparametricModel):  # pragma: no cover
         -------
         self
         """
-        return _NonparametricModel.fit(self, states, forcing, inputs=None)
+        return _NonparametricModel.fit(
+            self, states, forcing, inputs=None, initial_guess=initial_guess
+        )
 
     def rhs(self, state):
         r"""Evaluate the right-hand side of the model by applying each operator
@@ -657,7 +679,7 @@ class DiscreteModel(_NonparametricModel):
             return states, nextstates, inputs
         return states, nextstates
 
-    def fit(self, states, nextstates=None, inputs=None):
+    def fit(self, states, nextstates=None, inputs=None, initial_guess=None):
         r"""Learn the model operators from data.
 
         The operators are inferred by solving the regression problem
@@ -710,7 +732,13 @@ class DiscreteModel(_NonparametricModel):
             states = states[:, :-1]
         if inputs is not None:
             inputs = inputs[..., : states.shape[1]]
-        return _NonparametricModel.fit(self, states, nextstates, inputs=inputs)
+        return _NonparametricModel.fit(
+            self,
+            states,
+            nextstates,
+            inputs=inputs,
+            initial_guess=initial_guess,
+        )
 
     def rhs(self, state, input_=None):
         r"""Evaluate the right-hand side of the model by applying each operator
@@ -856,7 +884,7 @@ class ContinuousModel(_NonparametricModel):
     _STATE_LABEL = "q(t)"
     _INPUT_LABEL = "u(t)"
 
-    def fit(self, states, ddts, inputs=None):
+    def fit(self, states, ddts, inputs=None, initial_guess=None):
         r"""Learn the model operators from data.
 
         The operators are inferred by solving the regression problem
@@ -904,7 +932,9 @@ class ContinuousModel(_NonparametricModel):
         -------
         self
         """
-        return _NonparametricModel.fit(self, states, ddts, inputs=inputs)
+        return _NonparametricModel.fit(
+            self, states, ddts, inputs=inputs, initial_guess=initial_guess
+        )
 
     def rhs(self, t, state, input_func=None):
         r"""Evaluate the right-hand side of the model by applying each operator
