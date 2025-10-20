@@ -277,7 +277,7 @@ class _ParametricModel(_OpInfModel):
         self, parameters, states, lhs, inputs=None, initial_guess=None
     ):
         """Construct a solver for the operator inference least-squares
-        regression."""
+        regression with regularization towards <initial_guess>"""
         (
             parameters_,
             states_,
@@ -334,6 +334,9 @@ class _ParametricModel(_OpInfModel):
         changing its ``regularizer`` attribute and calling this method solves
         the regression with the new regression value without re-factorizing the
         data matrix.
+
+        If an initial guess is provided, it will be added to the solution
+        of the regularized least squares problem.
         """
         if self._fully_intrusive:
             warnings.warn(
@@ -403,6 +406,10 @@ class _ParametricModel(_OpInfModel):
             corresponding to parameter value ``parameters[i]``; each column
             ``inputs[i][:, j]`` corresponds to the snapshot ``states[:, j]``.
             May be a two-dimensional array if :math:`m=1` (scalar input).
+        initial_guess : Initial guess for \Ohat as
+            array of shape (d(r, m), r). Used for Tikhonov
+            regularization. Assumed zero (classic Tikhonov regularization)
+            if not provided.
 
         Returns
         -------
@@ -823,6 +830,10 @@ class _ParametricContinuousMixin:
             ``states[i][:, j]``.
             May be a two-dimensional array if :math:`m=1` (scalar input).
             Only required if one or more model operators depend on inputs.
+        initial_guess : Initial guess for \Ohat as
+            array of shape (d(r, m), r). Used for Tikhonov
+            regularization. Assumed zero (classic Tikhonov regularization)
+            if not provided.
 
         Returns
         -------

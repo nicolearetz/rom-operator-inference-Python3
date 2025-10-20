@@ -237,7 +237,9 @@ class _NonparametricModel(_OpInfModel):
 
     def _fit_solver(self, states, lhs, inputs=None, initial_guess=None):
         """Construct a solver object mapping the regularizer to solutions
-        of the Operator Inference least-squares problem.
+        of the Operator Inference least-squares problem. The rhs is
+        adjusted such that we regularize towards the initial_guess (if
+        provided)
         """
         # Set up non-intrusive learning.
         states_, lhs_, inputs_ = self._process_fit_arguments(
@@ -267,6 +269,9 @@ class _NonparametricModel(_OpInfModel):
         changing its ``regularizer`` attribute and calling this method solves
         the regression with the new regression value without re-factorizing the
         data matrix.
+
+        If an initial guess is provided, it will be added to the solution
+        of the regularized least squares problem.
         """
         # Fully intrusive case (nothing to learn).
         if self._fully_intrusive:
@@ -336,6 +341,10 @@ class _NonparametricModel(_OpInfModel):
             Input training data. Each column ``inputs[:, j]`` corresponds
             to the snapshot ``states[:, j]``.
             May be a one-dimensional array if ``m=1`` (scalar input).
+        initial_guess : Initial guess for \Ohat as
+            array of shape (d(r, m), r). Used for Tikhonov
+            regularization. Assumed zero (classic Tikhonov regularization)
+            if not provided.
 
         Returns
         -------
@@ -560,6 +569,10 @@ class SteadyModel(_NonparametricModel):  # pragma: no cover
             Forcing training data. Each column ``forcing[:, j]``
             corresponds to the snapshot ``states[:, j]``.
             If ``None``, set ``forcing = 0``.
+        initial_guess : Initial guess for \Ohat as
+            array of shape (d(r, m), r). Used for Tikhonov
+            regularization. Assumed zero (classic Tikhonov regularization)
+            if not provided.
 
         Returns
         -------
@@ -722,6 +735,10 @@ class DiscreteModel(_NonparametricModel):
             Input training data. Each column ``inputs[:, j]`` corresponds
             to the snapshot ``states[:, j]``.
             May be a one-dimensional array if ``m=1`` (scalar input).
+        initial_guess : Initial guess for \Ohat as
+            array of shape (d(r, m), r). Used for Tikhonov
+            regularization. Assumed zero (classic Tikhonov regularization)
+            if not provided.
 
         Returns
         -------
@@ -927,6 +944,10 @@ class ContinuousModel(_NonparametricModel):
             Input training data. Each column ``inputs[:, j]`` corresponds
             to the snapshot ``states[:, j]``.
             May be a one-dimensional array if ``m=1`` (scalar input).
+        initial_guess : Initial guess for \Ohat as
+            array of shape (d(r, m), r). Used for Tikhonov
+            regularization. Assumed zero (classic Tikhonov regularization)
+            if not provided.
 
         Returns
         -------
