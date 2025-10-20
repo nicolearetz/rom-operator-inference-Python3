@@ -4,6 +4,7 @@ from ._base import OpInfOperator
 import numpy as np
 
 import scipy.linalg as la
+import itertools
 
 # import scipy.sparse as sparse
 from scipy.special import comb
@@ -189,10 +190,43 @@ class PolynomialOperator(OpInfOperator):
                 kept[p]
             ]
 
+    @staticmethod
+    def ckron_indices(r, p):
+        """Construct a mask for efficiently computing the compressed, p-times
+        repeated Kronecker product.
+
+        This method provides a faster way to evaluate :meth:`ckron`
+        when the state dimension ``r`` is known *a priori*.
+
+        Parameters
+        ----------
+        r : int
+            State dimension.
+        p: int
+            polynomial order
+
+        Returns
+        -------
+        mask : ndarray
+            Compressed Kronecker product mask.
+
+        """
+        mask = np.array(
+            [*itertools.combinations_with_replacement([*range(r)][::-1], p)]
+        )[::-1, :]
+        return mask
+
     def apply(self, state: np.ndarray, input_=None) -> np.ndarray:
         r"""Apply the operator to the given state. Input is not used.
         See OpInfOperator.apply for description.
         """
+        # note: having all these if conditions here to distinguish between
+        # p=0, p=1, p>1
+        # really makes things slower than necessary (apply gets called a lot)
+        # it might be worth excluding these special cases from the
+        # PolynomialOperator
+        # class and defaulting to ConstantOperator and LinearOperator instead.
+
         if state.shape[0] != self.state_dimension:
             raise ValueError(
                 f"Expected state of dimension r={self.state_dimension}."
@@ -215,9 +249,8 @@ class PolynomialOperator(OpInfOperator):
         # note: no need to go through the trouble of identifying the
         # non-redundant indices
 
-        # higher-order
-        restricted_kronecker_product = PolynomialOperator.exp_p(
-            x=state, p=self.polynomial_order, kept=self.nonredudant_entries
+        restricted_kronecker_product = np.prod(
+            state[self.nonredudant_entries_mask], axis=1
         )
         return self.entries @ restricted_kronecker_product
 
@@ -228,8 +261,17 @@ class PolynomialOperator(OpInfOperator):
         when restricting the i-times Kronecker product of a vector of
         shape self.state_dimension() with itself.
         """
-        # return self.__nonredudant_entries
         return [
             PolynomialOperator.keptIndices_p(r=self.state_dimension, p=i)
             for i in range(self.polynomial_order + 1)
         ]
+
+    @property
+    def nonredudant_entries_mask(self) -> np.ndarray:
+        r"""list containing at index i a list of the indices that are kept
+        when restricting the i-times Kronecker product of a vector of
+        shape self.state_dimension() with itself.
+        """
+        return self.ckron_indices(
+            r=self.state_dimension, p=self.polynomial_order
+        )

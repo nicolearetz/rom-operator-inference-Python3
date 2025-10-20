@@ -341,6 +341,22 @@ class _TestNonparametricModel(_TestModel):
                 else:
                     model.fit(*args)  # No inputs.
 
+                    # check if regularization towards a non-zero
+                    # initial guess actually
+                    # regularizes towards it
+                    Ohat_towards_zero = model._Ohat
+                    initial_guess = np.random.normal(
+                        size=Ohat_towards_zero.shape
+                    )
+                    model.fit(*args, initial_guess=initial_guess)
+                    Ohat_towards_init = model._Ohat
+                    a = la.norm(Ohat_towards_zero)
+                    b = la.norm(Ohat_towards_init)
+                    assert a <= b or np.isclose(a, b)
+                    a = la.norm(Ohat_towards_zero - initial_guess)
+                    b = la.norm(Ohat_towards_init - initial_guess)
+                    assert a >= b or np.isclose(a, b)
+
         # Special case: fully intrusive.
         c, A, H, G, B, N = self.get_operators(r, m)
 

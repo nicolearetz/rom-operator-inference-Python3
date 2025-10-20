@@ -358,6 +358,7 @@ class TestPODBasis(_TestBasisTemplate):
             f"only {k} singular vectors can be extracted from ({n} x {k}) "
             f"snapshots, setting max_vectors={k}"
         )
+
         assert out is basis
         assert basis.full_state_dimension == n
         assert basis.reduced_state_dimension == r
@@ -377,7 +378,9 @@ class TestPODBasis(_TestBasisTemplate):
             weights=SP,
             minthresh=1e-20,
         )
+
         out = basis.fit(Q)
+
         assert out is basis
         assert basis.full_state_dimension == n
         assert basis.reduced_state_dimension == r

@@ -6,6 +6,7 @@ import os
 import pytest
 import numpy as np
 import scipy.interpolate as interp
+import scipy.linalg as la
 
 import opinf
 
@@ -298,6 +299,18 @@ class _TestParametricModel(_TestModel):
             assert op.parameter_dimension == p
             assert op.entries is not None
 
+        # test if setting an initial guess works
+        Ohat_towards_zero = out._Ohat
+        initial_guess = np.random.normal(size=Ohat_towards_zero.shape)
+        model.fit(params, states, lhs, initial_guess=initial_guess)
+        Ohat_towards_init = model._Ohat
+        a = la.norm(Ohat_towards_zero)
+        b = la.norm(Ohat_towards_init)
+        assert a <= b or np.isclose(a, b)
+        a = la.norm(Ohat_towards_zero - initial_guess)
+        b = la.norm(Ohat_towards_init - initial_guess)
+        assert a >= b or np.isclose(a, b)
+
         # Multiple affine operators.
         model = self.Model(
             [
@@ -310,6 +323,18 @@ class _TestParametricModel(_TestModel):
         for op in model.operators:
             assert op.parameter_dimension == p
             assert op.entries is not None
+
+        # test if setting an initial guess works
+        Ohat_towards_zero = out._Ohat
+        initial_guess = np.random.normal(size=Ohat_towards_zero.shape)
+        model.fit(params, states, lhs, inputs, initial_guess=initial_guess)
+        Ohat_towards_init = model._Ohat
+        a = la.norm(Ohat_towards_zero)
+        b = la.norm(Ohat_towards_init)
+        assert a <= b or np.isclose(a, b)
+        a = la.norm(Ohat_towards_zero - initial_guess)
+        b = la.norm(Ohat_towards_init - initial_guess)
+        assert a >= b or np.isclose(a, b)
 
         # Mix of affine and interpolatory operators.
         model = self.Model(
