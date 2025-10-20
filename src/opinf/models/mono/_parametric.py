@@ -22,6 +22,7 @@ from ._nonparametric import (
 )
 from ... import errors, utils, operators as _operators
 from ...operators import _utils as oputils
+from ...operators._polynomial_operator import PolynomialOperator
 
 
 # Base classes ================================================================
@@ -70,7 +71,15 @@ class _ParametricModel(_OpInfModel):
         of operation (e.g., two constant operators).
         """
         OpClasses = {
-            (op._OperatorClass if oputils.is_parametric(op) else type(op))
+            (
+                op._OperatorClass
+                if oputils.is_parametric(op)
+                else (
+                    op.polynomial_order
+                    if type(op) is PolynomialOperator
+                    else type(op)
+                )
+            )
             for op in ops
         }
         if len(OpClasses) != len(ops):
@@ -264,9 +273,11 @@ class _ParametricModel(_OpInfModel):
             blocks.append(block.T)
         return np.hstack(blocks)
 
-    def _fit_solver(self, parameters, states, lhs, inputs=None):
+    def _fit_solver(
+        self, parameters, states, lhs, inputs=None, initial_guess=None
+    ):
         """Construct a solver for the operator inference least-squares
-        regression."""
+        regression with regularization towards <initial_guess>"""
         (
             parameters_,
             states_,
@@ -281,7 +292,19 @@ class _ParametricModel(_OpInfModel):
 
         # Set up non-intrusive learning.
         D = self._assemble_data_matrix(parameters_, states_, inputs_)
-        self.solver.fit(D, np.hstack(lhs_))
+        R = np.hstack(lhs_)
+
+        if initial_guess is not None:
+            if initial_guess.shape != (R.shape[0], D.shape[1]):
+                raise RuntimeError(
+                    f"""In _NonparametricModel.refit:
+                                   initial_guess was passed of shape
+                                   {initial_guess.shape}, expected
+                                   {(R.shape[0], D.shape[1])}"""
+                )
+            R = R - (D @ initial_guess.T).T
+
+        self.solver.fit(D, R)
         self.__s = len(parameters_)
 
     def _extract_operators(self, Ohat):
@@ -301,7 +324,7 @@ class _ParametricModel(_OpInfModel):
                 op.set_entries(Ohat[:, index:endex])
             index = endex
 
-    def refit(self):
+    def refit(self, initial_guess=None):
         """Solve the Operator Inference regression using the data from the
         last :meth:`fit()` call, then extract the inferred operators.
 
@@ -311,6 +334,9 @@ class _ParametricModel(_OpInfModel):
         changing its ``regularizer`` attribute and calling this method solves
         the regression with the new regression value without re-factorizing the
         data matrix.
+
+        If an initial guess is provided, it will be added to the solution
+        of the regularized least squares problem.
         """
         if self._fully_intrusive:
             warnings.warn(
@@ -320,10 +346,14 @@ class _ParametricModel(_OpInfModel):
             return self
 
         # Execute non-intrusive learning.
-        self._extract_operators(self.solver.solve())
+        self._Ohat = self.solver.solve()
+        if initial_guess is not None:
+            self._Ohat += initial_guess
+
+        self._extract_operators(Ohat=self._Ohat)
         return self
 
-    def fit(self, parameters, states, lhs, inputs=None):
+    def fit(self, parameters, states, lhs, inputs=None, initial_guess=None):
         r"""Learn the model operators from data.
 
         The operators are inferred by solving the regression problem
@@ -376,6 +406,10 @@ class _ParametricModel(_OpInfModel):
             corresponding to parameter value ``parameters[i]``; each column
             ``inputs[i][:, j]`` corresponds to the snapshot ``states[:, j]``.
             May be a two-dimensional array if :math:`m=1` (scalar input).
+        initial_guess : Initial guess for \Ohat as
+            array of shape (d(r, m), r). Used for Tikhonov
+            regularization. Assumed zero (classic Tikhonov regularization)
+            if not provided.
 
         Returns
         -------
@@ -388,8 +422,10 @@ class _ParametricModel(_OpInfModel):
             )
             return self
 
-        self._fit_solver(parameters, states, lhs, inputs)
-        return self.refit()
+        self._fit_solver(
+            parameters, states, lhs, inputs, initial_guess=initial_guess
+        )
+        return self.refit(initial_guess=initial_guess)
 
     # Parametric evaluation ---------------------------------------------------
     def evaluate(self, parameter):
@@ -511,7 +547,14 @@ class _ParametricDiscreteMixin:
 
     _ModelClass = _FrozenDiscreteModel
 
-    def fit(self, parameters, states, nextstates=None, inputs=None):
+    def fit(
+        self,
+        parameters,
+        states,
+        nextstates=None,
+        inputs=None,
+        initial_guess=None,
+    ):
         r"""Learn the model operators from data.
 
         The operators are inferred by solving the regression problem
@@ -585,6 +628,8 @@ class _ParametricDiscreteMixin:
             corresponding to parameter value ``parameters[i]``; each column
             ``inputs[i][:, j]`` corresponds to the snapshot ``states[:, j]``.
             May be a two-dimensional array if :math:`m=1` (scalar input).
+        initial_guess: currently ignored,
+            only here for synergy with parent class
 
         Returns
         -------
@@ -718,7 +763,7 @@ class _ParametricContinuousMixin:
 
     _ModelClass = _FrozenContinuousModel
 
-    def fit(self, parameters, states, ddts, inputs=None):
+    def fit(self, parameters, states, ddts, inputs=None, initial_guess=None):
         r"""Learn the model operators from data.
 
         The operators are inferred by solving the regression problem
@@ -794,12 +839,22 @@ class _ParametricContinuousMixin:
             ``states[i][:, j]``.
             May be a two-dimensional array if :math:`m=1` (scalar input).
             Only required if one or more model operators depend on inputs.
+        initial_guess : Initial guess for \Ohat as
+            array of shape (d(r, m), r). Used for Tikhonov
+            regularization. Assumed zero (classic Tikhonov regularization)
+            if not provided.
 
         Returns
         -------
         self
         """
-        return super().fit(parameters, states, ddts, inputs=inputs)
+        return super().fit(
+            parameters,
+            states,
+            ddts,
+            inputs=inputs,
+            initial_guess=initial_guess,
+        )
 
     def rhs(self, t, parameter, state, input_func=None):
         r"""Evaluate the right-hand side of the model by applying each operator
@@ -1126,9 +1181,14 @@ class _InterpModel(_ParametricModel):
             "_extract_operators() not used by this class"
         )
 
-    def _fit_solver(self, parameters, states, lhs, inputs=None):
+    def _fit_solver(
+        self, parameters, states, lhs, inputs=None, initial_guess=None
+    ):
         """Construct a solver for the operator inference least-squares
         regression.
+
+        initial_guess: currently does not get used, is here only
+        for synergy with the class structure
         """
         (
             parameters_,
@@ -1150,19 +1210,19 @@ class _InterpModel(_ParametricModel):
                 ],
                 solver=self.solver.copy(),
             )
-            model_i._fit_solver(
-                states_[i],
-                lhs_[i],
-                inputs_[i],
-            )
+            model_i._fit_solver(states_[i], lhs_[i], inputs_[i])
             nonparametric_models.append(model_i)
 
         self.solvers = [mdl.solver for mdl in nonparametric_models]
         self._submodels = nonparametric_models
         self._training_parameters = parameters_
 
-    def refit(self):
-        """Evaluate the least-squares solver and process the results."""
+    def refit(self, initial_guess=None):
+        """Evaluate the least-squares solver and process the results.
+
+        initial_guess: currently not used, only here for synergy
+        with parent class
+        """
         if self._submodels is None:
             raise RuntimeError("model solvers not set, call fit() first")
 

@@ -387,7 +387,11 @@ def test_publics():
             OpClass, _submodule._AffineOperator
         ):
             continue
-        op = OpClass(_TestAffineOperator.thetas1)
+
+        if OpClassName == "AffinePolynomialOperator":
+            op = OpClass(_TestAffineOperator.thetas1, polynomial_order=1)
+        else:
+            op = OpClass(_TestAffineOperator.thetas1)
         assert issubclass(
             op._OperatorClass,
             opinf.operators.OpInfOperator,
