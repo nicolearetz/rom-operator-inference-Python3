@@ -120,10 +120,26 @@ def method_of_snapshots(
     eigvals = eigvals[::-1]
     eigvecs = eigvecs[:, ::-1]
 
+    # can at most have as many non-zero eigenvalues as there was data
+    if eigvals.shape[0] > states.shape[0]:
+        eigvals[states.shape[0] :] = 0
+    if eigvals.shape[0] > states.shape[1]:
+        eigvals[states.shape[1] :] = 0
+
     # By definition the Gramian is symmetric positive semi-definite.
     # If any eigenvalues are smaller than zero, they are only measuring
     # numerical error and can be truncated.
     positives = eigvals > max(minthresh, abs(np.min(eigvals)))
+
+    if sum(positives) > states.shape[0]:
+        print(eigvals)
+        print(positives)
+        raise RuntimeError(
+            f"""selected more non-zero singular values {sum(positives)}
+            than there are state dimensions ({states.shape[0]})"""
+        )
+
+    # can at most have as many non-zero entries as there were state dofs
     eigvecs = eigvecs[:, positives]
     eigvals = eigvals[positives]
 
@@ -133,23 +149,33 @@ def method_of_snapshots(
 
     # if basis functions are not orthonormal, apply Gram-Schmidt
     counter = 0
+
+    def inner_product(V):
+        if inner_product_matrix is None:
+            return V.T @ V
+        return V.T @ _Wmult(inner_product_matrix, V)
+
     while (
-        not np.isclose(
-            V.T @ inner_product_matrix @ V, np.eye(V.shape[1])
-        ).all()
-    ) and counter < 5:
-        V_old = V.copy()
+        not np.isclose(inner_product(V), np.eye(V.shape[1])).all()
+    ) and counter < 10:
         for i in range(V.shape[1]):
-            v_i = V_old[:, i]
+            v_i = V[:, i]
             for j in range(i):
-                v_i = v_i - (v_i.T @ inner_product_matrix @ V[:, j]) * V[:, j]
-            norm_vi = np.sqrt(v_i.T @ inner_product_matrix @ v_i)
+                v_i = (
+                    v_i
+                    - (v_i.T @ _Wmult(inner_product_matrix, V[:, j])) * V[:, j]
+                )
+            norm_vi = np.sqrt(v_i.T @ _Wmult(inner_product_matrix, v_i))
             V[:, i] = v_i / norm_vi
+
+        if V.shape[0] != states.shape[0]:
+            print(V.shape, counter)
+            raise RuntimeError(
+                "something went seriously wrong in computation of V"
+            )
         counter += 1
 
-    if not np.isclose(
-        V.T @ inner_product_matrix @ V, np.eye(V.shape[1])
-    ).all():
+    if not np.isclose(inner_product(V), np.eye(V.shape[1])).all():
         raise RuntimeWarning("Computed basis functions are not orthonormal.")
 
     return V, svals, eigvecs.T

@@ -295,12 +295,12 @@ class _ParametricModel(_OpInfModel):
         R = np.hstack(lhs_)
 
         if initial_guess is not None:
-            if initial_guess.shape != (D.shape[1], R.shape[0]):
+            if initial_guess.shape != (R.shape[0], D.shape[1]):
                 raise RuntimeError(
                     f"""In _NonparametricModel.refit:
                                    initial_guess was passed of shape
                                    {initial_guess.shape}, expected
-                                   {(D.shape[1], R.shape[0])}"""
+                                   {(R.shape[0], D.shape[1])}"""
                 )
             R = R - (D @ initial_guess.T).T
 
@@ -547,7 +547,14 @@ class _ParametricDiscreteMixin:
 
     _ModelClass = _FrozenDiscreteModel
 
-    def fit(self, parameters, states, nextstates=None, inputs=None):
+    def fit(
+        self,
+        parameters,
+        states,
+        nextstates=None,
+        inputs=None,
+        initial_guess=None,
+    ):
         r"""Learn the model operators from data.
 
         The operators are inferred by solving the regression problem
@@ -621,6 +628,8 @@ class _ParametricDiscreteMixin:
             corresponding to parameter value ``parameters[i]``; each column
             ``inputs[i][:, j]`` corresponds to the snapshot ``states[:, j]``.
             May be a two-dimensional array if :math:`m=1` (scalar input).
+        initial_guess: currently ignored,
+            only here for synergy with parent class
 
         Returns
         -------
@@ -1172,9 +1181,14 @@ class _InterpModel(_ParametricModel):
             "_extract_operators() not used by this class"
         )
 
-    def _fit_solver(self, parameters, states, lhs, inputs=None):
+    def _fit_solver(
+        self, parameters, states, lhs, inputs=None, initial_guess=None
+    ):
         """Construct a solver for the operator inference least-squares
         regression.
+
+        initial_guess: currently does not get used, is here only
+        for synergy with the class structure
         """
         (
             parameters_,
@@ -1196,19 +1210,19 @@ class _InterpModel(_ParametricModel):
                 ],
                 solver=self.solver.copy(),
             )
-            model_i._fit_solver(
-                states_[i],
-                lhs_[i],
-                inputs_[i],
-            )
+            model_i._fit_solver(states_[i], lhs_[i], inputs_[i])
             nonparametric_models.append(model_i)
 
         self.solvers = [mdl.solver for mdl in nonparametric_models]
         self._submodels = nonparametric_models
         self._training_parameters = parameters_
 
-    def refit(self):
-        """Evaluate the least-squares solver and process the results."""
+    def refit(self, initial_guess=None):
+        """Evaluate the least-squares solver and process the results.
+
+        initial_guess: currently not used, only here for synergy
+        with parent class
+        """
         if self._submodels is None:
             raise RuntimeError("model solvers not set, call fit() first")
 

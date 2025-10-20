@@ -248,12 +248,12 @@ class _NonparametricModel(_OpInfModel):
         D = self._assemble_data_matrix(states_, inputs_)
 
         if initial_guess is not None:
-            if initial_guess.shape != (D.shape[1], lhs_.shape[0]):
+            if initial_guess.shape != (lhs_.shape[0], D.shape[1]):
                 raise RuntimeError(
                     f"""In _NonparametricModel.refit:
                                    initial_guess was passed of shape
                                    {initial_guess.shape}, expected
-                                   {(D.shape[1], lhs_.shape[0])}"""
+                                   {(lhs_.shape[0], D.shape[1])}"""
                 )
             lhs_ = lhs_ - (D @ initial_guess.T).T
 
