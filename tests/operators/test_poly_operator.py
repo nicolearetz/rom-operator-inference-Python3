@@ -6,6 +6,7 @@ import numpy as np
 import opinf
 
 from opinf.operators._polynomial_operator import PolynomialOperator
+from opinf.operators._affine import AffinePolynomialOperator
 
 other_operators = opinf.operators._nonparametric
 
@@ -159,3 +160,152 @@ def test_apply_against_reference(r, p):
     # compare
     assert action.shape == action_ref.shape == (r,)  # same size
     assert np.isclose(action, action_ref).all()  # same entries
+
+
+@pytest.mark.parametrize("r", [(r) for r in range(3, 10)])
+def test_restrict_to_subspace(r):
+
+    indices_test = np.random.randint(0, r, size=(1,)).tolist()
+    indices_trial = [0, 2]
+
+    # constant
+    large_matrix = np.random.normal(size=(r, 1))
+    small_matrix = large_matrix[indices_test, 0]
+    assert np.isclose(
+        small_matrix,
+        PolynomialOperator.restrict_matrix_to_subspace(
+            indices_trial=indices_trial,
+            indices_test=indices_test,
+            entries=large_matrix,
+            polynomial_order=0,
+        ),
+    ).all()
+
+    operator = PolynomialOperator(polynomial_order=0)
+    operator.set_entries(large_matrix)
+    assert np.isclose(
+        small_matrix,
+        operator.restrict_me_to_subspace(
+            indices_trial=indices_trial, indices_test=indices_test
+        ).entries,
+    ).all()
+
+    operator = AffinePolynomialOperator(
+        polynomial_order=0, coeffs=1, entries=[large_matrix]
+    )
+    assert np.isclose(
+        small_matrix,
+        operator.restrict_me_to_subspace(
+            indices_trial=indices_trial, indices_test=indices_test
+        ).entries,
+    ).all()
+
+    # linear
+    large_matrix = np.random.normal(size=(r, r))
+    small_matrix = large_matrix[indices_test, :][:, indices_trial]
+    assert np.isclose(
+        small_matrix,
+        PolynomialOperator.restrict_matrix_to_subspace(
+            indices_trial=indices_trial,
+            indices_test=indices_test,
+            entries=large_matrix,
+            polynomial_order=1,
+        ),
+    ).all()
+
+    operator = PolynomialOperator(polynomial_order=1)
+    operator.entries = large_matrix
+    assert np.isclose(
+        small_matrix,
+        operator.restrict_me_to_subspace(
+            indices_trial=indices_trial, indices_test=indices_test
+        ).entries,
+    ).all()
+
+    operator = AffinePolynomialOperator(
+        polynomial_order=1, coeffs=1, entries=[large_matrix]
+    )
+    assert np.isclose(
+        small_matrix,
+        operator.restrict_me_to_subspace(
+            indices_trial=indices_trial, indices_test=indices_test
+        ).entries,
+    ).all()
+
+    # quadratic
+    large_matrix = np.random.normal(
+        size=(
+            r,
+            PolynomialOperator.polynomial_operator_dimension(
+                r=r, polynomial_order=2
+            ),
+        )
+    )
+    small_matrix = large_matrix[indices_test, :][:, [0, 3, 5]]
+    assert np.isclose(
+        small_matrix,
+        PolynomialOperator.restrict_matrix_to_subspace(
+            indices_trial=indices_trial,
+            indices_test=indices_test,
+            entries=large_matrix,
+            polynomial_order=2,
+        ),
+    ).all()
+
+    operator = PolynomialOperator(polynomial_order=2)
+    operator.entries = large_matrix
+    assert np.isclose(
+        small_matrix,
+        operator.restrict_me_to_subspace(
+            indices_trial=indices_trial, indices_test=indices_test
+        ).entries,
+    ).all()
+
+    operator = AffinePolynomialOperator(
+        polynomial_order=2, coeffs=1, entries=[large_matrix]
+    )
+    assert np.isclose(
+        small_matrix,
+        operator.restrict_me_to_subspace(
+            indices_trial=indices_trial, indices_test=indices_test
+        ).entries,
+    ).all()
+
+    # cubic
+    large_matrix = np.random.normal(
+        size=(
+            r,
+            PolynomialOperator.polynomial_operator_dimension(
+                r=r, polynomial_order=3
+            ),
+        )
+    )
+    small_matrix = large_matrix[indices_test, :][:, [0, 4, 7, 9]]
+    assert np.isclose(
+        small_matrix,
+        PolynomialOperator.restrict_matrix_to_subspace(
+            indices_trial=indices_trial,
+            indices_test=indices_test,
+            entries=large_matrix,
+            polynomial_order=3,
+        ),
+    ).all()
+
+    operator = PolynomialOperator(polynomial_order=3)
+    operator.entries = large_matrix
+    assert np.isclose(
+        small_matrix,
+        operator.restrict_me_to_subspace(
+            indices_trial=indices_trial, indices_test=indices_test
+        ).entries,
+    ).all()
+
+    operator = AffinePolynomialOperator(
+        polynomial_order=3, coeffs=1, entries=[large_matrix]
+    )
+    assert np.isclose(
+        small_matrix,
+        operator.restrict_me_to_subspace(
+            indices_trial=indices_trial, indices_test=indices_test
+        ).entries,
+    ).all()

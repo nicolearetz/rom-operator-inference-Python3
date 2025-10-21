@@ -80,12 +80,15 @@ class PolynomialOperator(OpInfOperator):
             raise ValueError(
                 f"expected non-negative integer reduced dimension r. Got r={r}"
             )
+        return PolynomialOperator.polynomial_operator_dimension(
+            r=r, polynomial_order=self.polynomial_order
+        )
 
-        # for constant operators the dimension does not matter
-        if (p := self.polynomial_order) == 0:
+    @staticmethod
+    def polynomial_operator_dimension(r, polynomial_order) -> int:
+        if polynomial_order == 0:
             return 1
-
-        return comb(r, p, repetition=True, exact=True)
+        return comb(r, polynomial_order, repetition=True, exact=True)
 
     def datablock(self, states: np.ndarray, inputs=None) -> np.ndarray:
         r"""Return the data matrix block corresponding to
@@ -349,5 +352,9 @@ class PolynomialOperator(OpInfOperator):
         return [
             comb(indices[i], p, repetition=True, exact=True) + sub[j]
             for i in range(len(indices))
-            for j in range(comb(i + 1, p - 1, repetition=True, exact=True))
+            for j in range(
+                PolynomialOperator.polynomial_operator_dimension(
+                    r=i + 1, polynomial_order=p - 1
+                )
+            )
         ]
