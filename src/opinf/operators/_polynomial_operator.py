@@ -275,3 +275,79 @@ class PolynomialOperator(OpInfOperator):
         return self.ckron_indices(
             r=self.state_dimension, p=self.polynomial_order
         )
+
+    def restrict_me_to_subspace(self, indices_trial, indices_test=None):
+
+        if indices_test is None:
+            indices_test = indices_trial
+
+        if max(indices_trial) >= self.state_dimension:
+            raise RuntimeError(
+                f"""
+                               In PolynomialOperator.restrict_to_subspace:
+                               Encountered restriction onto unknown trial basis
+                               vector number {max(indices_trial)}.
+                               Reduced dimension is {self.state_dimension}"""
+            )
+
+        if max(indices_test) >= self.state_dimension:
+            raise RuntimeError(
+                f"""
+                               In PolynomialOperator.restrict_to_subspace:
+                               Encountered restriction onto unknown test basis
+                               vector number {max(indices_test)}.
+                               Reduced dimension is {self.state_dimension}"""
+            )
+
+        new_entries = PolynomialOperator.restrict_matrix_to_subspace(
+            indices_trial=indices_trial,
+            entries=self.entries,
+            polynomial_order=self.polynomial_order,
+            indices_test=indices_test,
+        )
+
+        return PolynomialOperator(
+            entries=new_entries, polynomial_order=self.polynomial_order
+        )
+
+    @staticmethod
+    def restrict_matrix_to_subspace(
+        indices_trial, entries, polynomial_order, indices_test=None
+    ):
+        """
+        - not checking for duplicate indices
+        """
+        if indices_test is None:
+            indices_test = indices_trial
+
+        # constant
+        if polynomial_order == 0:
+            if np.ndim(entries) == 2:
+                return entries[indices_test, 0]
+            return entries[indices_test]
+
+        # higher-order polynomials
+        entries_sub = entries[indices_test, :]
+        # restrict to test indices only
+
+        col_indices = PolynomialOperator.columnIndices_p(
+            indices=indices_trial, p=polynomial_order
+        )
+        # find out which columns to keep
+
+        return entries_sub[:, col_indices]
+
+    @staticmethod
+    def columnIndices_p(indices, p):
+        if p == 1:
+            return indices
+
+        if p == 0:
+            return [0]
+
+        sub = PolynomialOperator.columnIndices_p(indices, p - 1)
+        return [
+            comb(indices[i], p, repetition=True, exact=True) + sub[j]
+            for i in range(len(indices))
+            for j in range(comb(i + 1, p - 1, repetition=True, exact=True))
+        ]

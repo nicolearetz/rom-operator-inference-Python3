@@ -805,6 +805,27 @@ class AffinePolynomialOperator(_AffineOperator):
             entries=entries, polynomial_order=self.polynomial_order
         )
 
+    def restrict_me_to_subspace(self, indices_trial, indices_test=None):
+        """
+        - not checking for duplicate indices
+        """
+        new_entries = [
+            PolynomialOperator.restrict_matrix_to_subspace(
+                indices_trial=indices_trial,
+                indices_test=indices_test,
+                entries=self.entries[i],
+                polynomial_order=self.polynomial_order,
+            )
+            for i in range(self.nterms)
+        ]
+
+        return AffinePolynomialOperator(
+            coeffs=self.coeffs,
+            polynomial_order=self.polynomial_order,
+            nterms=self.nterms,
+            entries=new_entries,
+        )
+
 
 class AffineInputOperator(_AffineOperator, InputMixin):
     r"""Affine-parametric input operator
