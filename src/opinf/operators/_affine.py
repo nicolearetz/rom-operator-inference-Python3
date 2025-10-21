@@ -805,7 +805,7 @@ class AffinePolynomialOperator(_AffineOperator):
             entries=entries, polynomial_order=self.polynomial_order
         )
 
-    def restrict_me_to_subspace(self, indices_trial, indices_test=None):
+    def restrict_to_subspace(self, indices_trial, indices_test=None):
         """
         - not checking for duplicate indices
         """
@@ -815,6 +815,34 @@ class AffinePolynomialOperator(_AffineOperator):
                 indices_test=indices_test,
                 entries=self.entries[i],
                 polynomial_order=self.polynomial_order,
+            )
+            for i in range(self.nterms)
+        ]
+
+        return AffinePolynomialOperator(
+            coeffs=self.coeffs,
+            polynomial_order=self.polynomial_order,
+            nterms=self.nterms,
+            entries=new_entries,
+        )
+
+    def extend_to_dimension(
+        self, new_r, indices_trial=None, indices_test=None, new_r_test=None
+    ):
+        """
+        - not checking for duplicate indices
+        """
+        if indices_trial is None:
+            indices_trial = [*range(self.state_dimension)]
+
+        new_entries = [
+            PolynomialOperator.extend_matrix_to_dimension(
+                new_r=new_r,
+                indices_trial=indices_trial,
+                indices_test=indices_test,
+                old_entries=self.entries[i],
+                polynomial_order=self.polynomial_order,
+                new_r_test=new_r_test,
             )
             for i in range(self.nterms)
         ]

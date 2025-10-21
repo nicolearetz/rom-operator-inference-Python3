@@ -185,7 +185,7 @@ def test_restrict_to_subspace(r):
     operator.set_entries(large_matrix)
     assert np.isclose(
         small_matrix,
-        operator.restrict_me_to_subspace(
+        operator.restrict_to_subspace(
             indices_trial=indices_trial, indices_test=indices_test
         ).entries,
     ).all()
@@ -195,7 +195,7 @@ def test_restrict_to_subspace(r):
     )
     assert np.isclose(
         small_matrix,
-        operator.restrict_me_to_subspace(
+        operator.restrict_to_subspace(
             indices_trial=indices_trial, indices_test=indices_test
         ).entries,
     ).all()
@@ -217,7 +217,7 @@ def test_restrict_to_subspace(r):
     operator.entries = large_matrix
     assert np.isclose(
         small_matrix,
-        operator.restrict_me_to_subspace(
+        operator.restrict_to_subspace(
             indices_trial=indices_trial, indices_test=indices_test
         ).entries,
     ).all()
@@ -227,7 +227,7 @@ def test_restrict_to_subspace(r):
     )
     assert np.isclose(
         small_matrix,
-        operator.restrict_me_to_subspace(
+        operator.restrict_to_subspace(
             indices_trial=indices_trial, indices_test=indices_test
         ).entries,
     ).all()
@@ -256,7 +256,7 @@ def test_restrict_to_subspace(r):
     operator.entries = large_matrix
     assert np.isclose(
         small_matrix,
-        operator.restrict_me_to_subspace(
+        operator.restrict_to_subspace(
             indices_trial=indices_trial, indices_test=indices_test
         ).entries,
     ).all()
@@ -266,7 +266,7 @@ def test_restrict_to_subspace(r):
     )
     assert np.isclose(
         small_matrix,
-        operator.restrict_me_to_subspace(
+        operator.restrict_to_subspace(
             indices_trial=indices_trial, indices_test=indices_test
         ).entries,
     ).all()
@@ -295,7 +295,7 @@ def test_restrict_to_subspace(r):
     operator.entries = large_matrix
     assert np.isclose(
         small_matrix,
-        operator.restrict_me_to_subspace(
+        operator.restrict_to_subspace(
             indices_trial=indices_trial, indices_test=indices_test
         ).entries,
     ).all()
@@ -305,7 +305,67 @@ def test_restrict_to_subspace(r):
     )
     assert np.isclose(
         small_matrix,
-        operator.restrict_me_to_subspace(
+        operator.restrict_to_subspace(
             indices_trial=indices_trial, indices_test=indices_test
         ).entries,
     ).all()
+
+
+@pytest.mark.parametrize(
+    "r_large, r_small, p",
+    [
+        (r_large, r_small, p)
+        for r_large in range(1, 8)
+        for r_small in range(1, r_large + 1)
+        for p in range(1, 4)
+    ],
+)
+def test_extend_dimension(r_large, r_small, p):
+    matrix_original = np.random.uniform(
+        size=(
+            r_small,
+            PolynomialOperator.polynomial_operator_dimension(
+                r=r_small, polynomial_order=p
+            ),
+        )
+    )
+
+    # sample random trial and test samples
+    indices_trial = np.random.choice(
+        [*range(r_large)], r_small, replace=False
+    ).tolist()
+    indices_test = np.random.choice(
+        [*range(r_large)], r_small, replace=False
+    ).tolist()
+    indices_trial.sort()
+    indices_test.sort()
+
+    # scale operator up and down
+    operator = PolynomialOperator(
+        polynomial_order=p, entries=matrix_original.copy()
+    )
+    operator_extended = operator.extend_to_dimension(
+        new_r=r_large, indices_test=indices_test, indices_trial=indices_trial
+    )
+    operator_condensed = operator_extended.restrict_to_subspace(
+        indices_trial=indices_trial, indices_test=indices_test
+    )
+    assert (matrix_original == operator_condensed.entries).all()
+
+    matrix_extended = PolynomialOperator.extend_matrix_to_dimension(
+        indices_test=indices_test,
+        indices_trial=indices_trial,
+        new_r=r_large,
+        polynomial_order=p,
+        old_entries=matrix_original,
+    )
+    matrix_condensed = PolynomialOperator.restrict_matrix_to_subspace(
+        indices_test=indices_test,
+        indices_trial=indices_trial,
+        polynomial_order=p,
+        entries=matrix_extended,
+    )
+
+    assert (matrix_condensed == matrix_original).all()
+    assert (matrix_condensed == operator_condensed.entries).all()
+    assert (matrix_extended == operator_extended.entries).all()
