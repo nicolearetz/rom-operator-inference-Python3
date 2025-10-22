@@ -80,12 +80,15 @@ class PolynomialOperator(OpInfOperator):
             raise ValueError(
                 f"expected non-negative integer reduced dimension r. Got r={r}"
             )
+        return PolynomialOperator.polynomial_operator_dimension(
+            r=r, polynomial_order=self.polynomial_order
+        )
 
-        # for constant operators the dimension does not matter
-        if (p := self.polynomial_order) == 0:
+    @staticmethod
+    def polynomial_operator_dimension(r, polynomial_order) -> int:
+        if polynomial_order == 0:
             return 1
-
-        return comb(r, p, repetition=True, exact=True)
+        return comb(r, polynomial_order, repetition=True, exact=True)
 
     def datablock(self, states: np.ndarray, inputs=None) -> np.ndarray:
         r"""Return the data matrix block corresponding to
@@ -275,3 +278,220 @@ class PolynomialOperator(OpInfOperator):
         return self.ckron_indices(
             r=self.state_dimension, p=self.polynomial_order
         )
+
+    def restrict_to_subspace(self, indices_trial, indices_test=None):
+
+        if indices_test is None:
+            indices_test = indices_trial
+
+        if max(indices_trial) >= self.state_dimension:
+            raise RuntimeError(
+                f"""
+                               In PolynomialOperator.restrict_to_subspace:
+                               Encountered restriction onto unknown trial basis
+                               vector number {max(indices_trial)}.
+                               Reduced dimension is {self.state_dimension}"""
+            )
+
+        if max(indices_test) >= self.state_dimension:
+            raise RuntimeError(
+                f"""
+                               In PolynomialOperator.restrict_to_subspace:
+                               Encountered restriction onto unknown test basis
+                               vector number {max(indices_test)}.
+                               Reduced dimension is {self.state_dimension}"""
+            )
+
+        new_entries = PolynomialOperator.restrict_matrix_to_subspace(
+            indices_trial=indices_trial,
+            entries=self.entries,
+            polynomial_order=self.polynomial_order,
+            indices_test=indices_test,
+        )
+
+        return PolynomialOperator(
+            entries=new_entries, polynomial_order=self.polynomial_order
+        )
+
+    @staticmethod
+    def restrict_matrix_to_subspace(
+        indices_trial, entries, polynomial_order, indices_test=None
+    ):
+        """
+        - not checking for duplicate indices
+        """
+        if indices_test is None:
+            indices_test = indices_trial
+
+        if indices_trial != sorted(indices_trial) or indices_test != sorted(
+            indices_test
+        ):
+            raise RuntimeError(
+                f"""
+        In PolynomialOperator.extend_matrix_to_dimension: Received unordered
+        indices {indices_trial} (trial) or {indices_test} (test).
+        """
+            )
+
+        # constant
+        if polynomial_order == 0:
+            if np.ndim(entries) == 2:
+                return entries[indices_test, 0]
+            return entries[indices_test]
+
+        # higher-order polynomials
+        entries_sub = entries[indices_test, :]
+        # restrict to test indices only
+
+        col_indices = PolynomialOperator.columnIndices_p(
+            indices=indices_trial, p=polynomial_order
+        )
+        # find out which columns to keep
+
+        return entries_sub[:, col_indices]
+
+    @staticmethod
+    def columnIndices_p(indices, p):
+        if p == 1:
+            return indices
+
+        if p == 0:
+            return [0]
+
+        sub = PolynomialOperator.columnIndices_p(indices, p - 1)
+        return [
+            comb(indices[i], p, repetition=True, exact=True) + sub[j]
+            for i in range(len(indices))
+            for j in range(
+                PolynomialOperator.polynomial_operator_dimension(
+                    r=i + 1, polynomial_order=p - 1
+                )
+            )
+        ]
+
+    def extend_to_dimension(
+        self, new_r, indices_trial=None, indices_test=None, new_r_test=None
+    ):
+        """ """
+        if indices_trial is None:
+            # default to extending the basis towards the right
+            indices_trial = [*range(self.state_dimension)]
+
+        if indices_test is None:
+            # default to Galerking case
+            indices_test = indices_trial
+
+        if new_r < self.state_dimension:
+            raise RuntimeError(
+                f"""In PolynomialOperator.extend_to_dimension:
+                Dimension mismatch. Expected new dimension ({new_r})
+                to be larger than old dimension ({self.state_dimension})
+                """
+            )
+
+        new_entries = PolynomialOperator.extend_matrix_to_dimension(
+            new_r=new_r,
+            indices_trial=indices_trial,
+            polynomial_order=self.polynomial_order,
+            old_entries=self.entries,
+            indices_test=indices_test,
+            new_r_test=new_r_test,
+        )
+
+        return PolynomialOperator(
+            polynomial_order=self.polynomial_order, entries=new_entries
+        )
+
+    @staticmethod
+    def extend_matrix_to_dimension(
+        new_r,
+        indices_trial,
+        polynomial_order,
+        old_entries,
+        indices_test=None,
+        new_r_test=None,
+    ):
+        """ """
+        if indices_test is None:
+            indices_test = indices_trial
+
+        if new_r_test is None:
+            new_r_test = new_r
+
+        if indices_trial != sorted(indices_trial) or indices_test != sorted(
+            indices_test
+        ):
+            raise RuntimeError(
+                f"""
+                In PolynomialOperator.extend_matrix_to_dimension:
+                Received unordered indices
+                {indices_trial} (trial) or {indices_test} (test).
+                """
+            )
+
+        old_r = len(indices_trial)
+        if not old_entries.shape == (
+            len(indices_test),
+            PolynomialOperator.polynomial_operator_dimension(
+                r=old_r, polynomial_order=polynomial_order
+            ),
+        ):
+            raise RuntimeError(
+                f"""In PolynomialOperator.extend_matrix_to_dimension:
+                Mismatch in the dimension of the passed matrix.
+                Expected {
+                    (len(indices_test),
+                     PolynomialOperator.polynomial_operator_dimension(r=old_r,
+                     polynomial_order=polynomial_order))}.
+                Got {old_entries.shape}.
+                """
+            )
+
+        if old_r > new_r:
+            raise RuntimeError(
+                f"""In PolynomialOperator.
+                               extend_matrix_to_dimension:
+                               Mismatch in passed indices:
+                               Old dimension {old_r} is larger
+                               than new dimension {new_r}
+                               """
+            )
+
+        if len(indices_test) > new_r_test:
+            raise RuntimeError(
+                f"""In PolynomialOperator.
+                extend_matrix_to_dimension:
+                               Mismatch in passed indices for test space:
+                               Old dimension {len(indices_test)} is
+                               larger than new test dimension {new_r_test}
+                               """
+            )
+
+        # initialize matrix for old test space dimension
+        new_marix_sub = np.zeros(
+            shape=(
+                len(indices_test),
+                PolynomialOperator.polynomial_operator_dimension(
+                    r=new_r, polynomial_order=polynomial_order
+                ),
+            )
+        )
+
+        # populate columns
+        col_indices = PolynomialOperator.columnIndices_p(
+            indices=indices_trial, p=polynomial_order
+        )
+        new_marix_sub[:, col_indices] = old_entries
+
+        # final matrix: fill remaining rows with zeros
+        new_matrix = np.zeros(
+            shape=(
+                new_r_test,
+                PolynomialOperator.polynomial_operator_dimension(
+                    r=new_r, polynomial_order=polynomial_order
+                ),
+            )
+        )
+        new_matrix[indices_test, :] = new_marix_sub
+
+        return new_matrix
