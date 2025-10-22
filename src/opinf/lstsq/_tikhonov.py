@@ -56,6 +56,10 @@ class _BaseRegularizedSolver(SolverTemplate):
         (\D\trp\D + \bfGamma_i\trp\bfGamma_i)\ohat_i = \D\trp\z_i.
     """
 
+    def __init__(self, initial_guess=None):
+        SolverTemplate.__init__(self=self)
+        self.initial_guess = initial_guess
+
     # Properties: regularization ----------------------------------------------
     @abc.abstractmethod
     def regularizer(self):
@@ -74,6 +78,42 @@ class _BaseRegularizedSolver(SolverTemplate):
             "Left-hand side" data matrix :math:`\Z` (not its transpose!).
             If one-dimensional, assume :math:`r = 1`.
         """
+        if self.initial_guess is not None:
+
+            # check if initial guess fits to data matrix shape
+            if self.initial_guess.shape[0] != data_matrix.shape[1]:
+                raise RuntimeError(
+                    f"""In _BaseRegularizedSolver.fit:
+                    Shape of data matrix ({data_matrix.shape[1]} columns)
+                    does not match initial guess
+                    ({self.initial_guess.shape[0]} rows)"""
+                )
+
+            # check if initial guess shape fits to lhs matrix shape
+            if len(lhs_matrix.shape) == 2 and (
+                len(self.initial_guess.shape) == 1
+                or self.initial_guess.shape[1] != lhs_matrix.shape[1]
+            ):
+                raise RuntimeError(
+                    f"""In _BaseRegularizedSolver.fit:
+                    Shape of lhs matrix ({lhs_matrix.shape[1]} columns)
+                    does not match initial guess
+                    (shape {self.initial_guess.shape})"""
+                )
+            if (
+                len(lhs_matrix.shape) == 1
+                and len(self.initial_guess.shape) != 1
+            ):
+                raise RuntimeError(
+                    f"""In _BaseRegularizedSolver.fit:
+                    Shape of lhs matrix (shape {lhs_matrix.shape} columns)
+                    does not match initial guess
+                    (shape {self.initial_guess.shape})"""
+                )
+
+            # adjust lhs matrix
+            lhs_matrix -= data_matrix @ self.initial_guess
+
         SolverTemplate.fit(self, data_matrix, lhs_matrix)
         if self.k < self.d:
             warnings.warn(
@@ -111,6 +151,16 @@ class _BaseRegularizedSolver(SolverTemplate):
     def regresidual(self, Ohat: np.ndarray) -> np.ndarray:
         """Compute the residual of the regularized regression problem."""
         raise NotImplementedError  # pragma: no cover
+
+    def add_initial_guess(self, Ohat):
+        if self.initial_guess is None:
+            return Ohat
+        return Ohat + self.initial_guess
+
+    def remove_initial_guess(self, Ohat):
+        if self.initial_guess is None:
+            return Ohat
+        return Ohat - self.initial_guess
 
     # Persistence -------------------------------------------------------------
     def reset(self) -> None:
@@ -237,9 +287,14 @@ class L2Solver(_BaseRegularizedSolver):
         See :func:`scipy.linalg.svd()`.
     """
 
-    def __init__(self, regularizer=None, lapack_driver: str = "gesdd"):
+    def __init__(
+        self,
+        regularizer=None,
+        lapack_driver: str = "gesdd",
+        initial_guess=None,
+    ):
         """Store the regularizer and initialize attributes."""
-        _BaseRegularizedSolver.__init__(self)
+        _BaseRegularizedSolver.__init__(self, initial_guess=initial_guess)
         self.regularizer = regularizer
         self.__options = types.MappingProxyType(
             dict(full_matrices=False, lapack_driver=lapack_driver)
@@ -323,7 +378,8 @@ class L2Solver(_BaseRegularizedSolver):
             raise AttributeError("solver regularizer not set")
         svals = self._svals.reshape((-1, 1))
         svals_inv = svals / (svals**2 + self.regularizer**2)
-        return (self._ZPhi * svals_inv.T) @ self._PsiT
+        Odiff = (self._ZPhi * svals_inv.T) @ self._PsiT
+        return self.add_initial_guess(Odiff)
 
     def posterior(self):
         r"""Solve the Bayesian operator inference regression, constructing the
@@ -421,8 +477,9 @@ class L2Solver(_BaseRegularizedSolver):
         """
         if self.regularizer is None:
             raise AttributeError("solver regularizer not set")
-        residual = self.residual(Ohat)
-        return residual + (self.regularizer**2 * np.sum(Ohat**2, axis=-1))
+        Odiff = self.remove_initial_guess(Ohat)
+        residual = self.residual(Odiff)
+        return residual + (self.regularizer**2 * np.sum(Odiff**2, axis=-1))
 
     # Persistence -------------------------------------------------------------
     def save(self, savefile: str, overwrite: bool = False):
