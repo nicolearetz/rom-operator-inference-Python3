@@ -894,5 +894,90 @@ class TestTikhonovDecoupledSolver(_TestBaseRegularizedSolver):
         return super().test_save_load_copy_and_reset(k=k, d=10, r=5)
 
 
+@pytest.mark.parametrize(
+    "n_cols, n_dofs, n_red",
+    [
+        (n_cols, n_dofs, n_red)
+        for n_cols in [20, 50, 100, 1000]
+        for n_dofs in [1, 2, 5, 10, 20]
+        for n_red in range(1, 5)
+    ],
+)
+def test_initial_guesses(n_cols, n_dofs, n_red):
+    D = np.random.normal(size=(n_cols, n_dofs))
+    R = np.random.normal(size=(n_red, n_cols))
+    guess = np.random.normal(size=(n_red, n_dofs))
+
+    def compare_to_std(solver_std, solver_ini):
+        solver_std.fit(D, R)
+        Ohat_std = solver_std.solve()
+
+        solver_ini.fit(D, R)
+        Ohat_ini = solver_ini.solve()
+
+        assert Ohat_std.shape == Ohat_ini.shape
+        assert Ohat_ini.shape == guess.shape
+
+        assert (
+            solver_std.regresidual(Ohat=Ohat_std)
+            <= solver_std.regresidual(Ohat=Ohat_ini)
+        ).all()
+        assert (
+            solver_ini.regresidual(Ohat=Ohat_std)
+            >= solver_ini.regresidual(Ohat=Ohat_ini)
+        ).all()
+
+    def compare_to_stronger(solver_class, regularizer):
+        # ensure that using a stronger regularization brings
+        # you closer to the initial guess
+        scaling = np.logspace(-5, 5, 11)
+        val_prev = np.inf * np.ones(n_red)
+        for i, scale in enumerate(scaling):
+            solver_ini = solver_class(
+                regularizer=scale * regularizer, initial_guess=guess
+            )
+            solver_ini.fit(D, R)
+            Ohat_ini = solver_ini.solve()
+            diff = la.norm(Ohat_ini - guess, axis=1) ** 2
+            assert (diff <= val_prev).all
+            val_prev = diff
+
+    # L2 solver
+    solver_std = opinf.lstsq.L2Solver(regularizer=1)
+    solver_ini = opinf.lstsq.L2Solver(regularizer=1, initial_guess=guess)
+    compare_to_std(solver_std, solver_ini)
+    compare_to_stronger(opinf.lstsq.L2Solver, regularizer=1)
+
+    # L2 decoupled solver
+    reg = np.logspace(-2, 2, n_red)
+    solver_std = opinf.lstsq.L2DecoupledSolver(regularizer=reg)
+    solver_ini = opinf.lstsq.L2DecoupledSolver(
+        regularizer=reg, initial_guess=guess
+    )
+    compare_to_std(solver_std, solver_ini)
+    compare_to_stronger(opinf.lstsq.L2DecoupledSolver, regularizer=reg)
+
+    # Tikhonov solver
+    reg = np.random.normal(size=(5 * n_dofs, n_dofs))
+    reg = reg.T @ reg
+    solver_std = opinf.lstsq.TikhonovSolver(regularizer=reg)
+    solver_ini = opinf.lstsq.TikhonovSolver(
+        regularizer=reg, initial_guess=guess
+    )
+    compare_to_std(solver_std, solver_ini)
+    compare_to_stronger(opinf.lstsq.TikhonovSolver, regularizer=reg)
+
+    # Tikhonov decoupled solver
+    reg = [None] * n_red
+    for i in range(n_red):
+        yolo = np.random.normal(size=(5 * n_dofs, n_dofs))
+        reg[i] = yolo.T @ yolo
+    solver_std = opinf.lstsq.TikhonovDecoupledSolver(regularizer=reg)
+    solver_ini = opinf.lstsq.TikhonovDecoupledSolver(
+        regularizer=reg, initial_guess=guess
+    )
+    compare_to_std(solver_std, solver_ini)
+
+
 if __name__ == "__main__":
     pytest.main([__file__])

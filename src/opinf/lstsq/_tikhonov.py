@@ -81,22 +81,19 @@ class _BaseRegularizedSolver(SolverTemplate):
         if self.initial_guess is not None:
 
             # check if initial guess fits to data matrix shape
-            if self.initial_guess.shape[0] != data_matrix.shape[1]:
+            if self.initial_guess.shape[1] != data_matrix.shape[1]:
                 raise RuntimeError(
                     f"""In _BaseRegularizedSolver.fit:
-                    Shape of data matrix ({data_matrix.shape[1]} columns)
+                    Shape of data matrix ({data_matrix})
                     does not match initial guess
-                    ({self.initial_guess.shape[0]} rows)"""
+                    ({self.initial_guess.shape})"""
                 )
 
             # check if initial guess shape fits to lhs matrix shape
-            if len(lhs_matrix.shape) == 2 and (
-                len(self.initial_guess.shape) == 1
-                or self.initial_guess.shape[1] != lhs_matrix.shape[1]
-            ):
+            if self.initial_guess.shape[0] != lhs_matrix.shape[0]:
                 raise RuntimeError(
                     f"""In _BaseRegularizedSolver.fit:
-                    Shape of lhs matrix ({lhs_matrix.shape[1]} columns)
+                    Shape of lhs matrix ({lhs_matrix.shape})
                     does not match initial guess
                     (shape {self.initial_guess.shape})"""
                 )
@@ -112,7 +109,7 @@ class _BaseRegularizedSolver(SolverTemplate):
                 )
 
             # adjust lhs matrix
-            lhs_matrix -= data_matrix @ self.initial_guess
+            lhs_matrix -= (data_matrix @ self.initial_guess.T).T
 
         SolverTemplate.fit(self, data_matrix, lhs_matrix)
         if self.k < self.d:
@@ -201,6 +198,9 @@ class _BaseRegularizedSolver(SolverTemplate):
                 for attr in extras:
                     hf.create_dataset(attr, data=getattr(self, attr))
 
+            if self.initial_guess is not None:
+                hf.create_dataset("initial_guess", data=self.initial_guess)
+
     @classmethod
     def _load(cls, loadfile: str, extras=tuple()):
         """Load a serialized solver from an HDF5 file, created previously from
@@ -226,10 +226,12 @@ class _BaseRegularizedSolver(SolverTemplate):
                 if cls is L2Solver:
                     reg = reg[0]
 
+            if "initial_guess" in hf:
+                cls.initial_guess = hf["initial_guess"]
+
             options = cls._load_dict(hf, "options")
             kwargs = dict(
-                regularizer=reg,
-                lapack_driver=options["lapack_driver"],
+                regularizer=reg, lapack_driver=options["lapack_driver"]
             )
 
             if issubclass(cls, TikhonovSolver):
@@ -766,9 +768,10 @@ class TikhonovSolver(_BaseRegularizedSolver):
         method: str = "lstsq",
         cond: float = None,
         lapack_driver: str = None,
+        initial_guess: np.array = None,
     ):
         """Store the regularizer and initialize attributes."""
-        _BaseRegularizedSolver.__init__(self)
+        _BaseRegularizedSolver.__init__(self, initial_guess=initial_guess)
         self.regularizer = regularizer
         self.method = method
         self.__options = dict(cond=cond, lapack_driver=lapack_driver)
@@ -1008,7 +1011,7 @@ class TikhonovSolver(_BaseRegularizedSolver):
         elif self.method == "normal":
             regD = self._DtD + (self.regularizer.T @ self.regularizer)
             Ohat = la.solve(regD, self._DtZt, assume_a="pos").T
-        return Ohat
+        return self.add_initial_guess(Ohat)
 
     def posterior(self):
         r"""Solve the Bayesian operator inference regression, constructing the
@@ -1099,8 +1102,9 @@ class TikhonovSolver(_BaseRegularizedSolver):
         """
         if self.regularizer is None:
             raise AttributeError("solver regularizer not set")
-        residual = self.residual(Ohat)
-        return residual + np.sum((self.regularizer @ Ohat.T) ** 2, axis=0)
+        Odiff = self.remove_initial_guess(Ohat)
+        residual = self.residual(Odiff)
+        return residual + np.sum((self.regularizer @ Odiff.T) ** 2, axis=0)
 
     def save(self, savefile: str, overwrite: bool = False):
         """Serialize the solver, saving it in HDF5 format.
@@ -1272,7 +1276,7 @@ class TikhonovDecoupledSolver(TikhonovSolver):
             elif self.method == "normal":
                 regD = self._DtD + Gamma.T @ Gamma
                 Ohat[i] = la.solve(regD, self._DtZt[:, i], assume_a="pos")
-        return Ohat
+        return self.add_initial_guess(Ohat)
 
     def posterior(self):
         r"""Solve the Bayesian operator inference regression, constructing the
@@ -1371,6 +1375,7 @@ class TikhonovDecoupledSolver(TikhonovSolver):
         """
         if self.regularizer is None:
             raise AttributeError("solver regularizer not set")
-        residual = self.residual(Ohat)
-        rg = [np.sum((G @ oi) ** 2) for G, oi in zip(self.regularizer, Ohat)]
+        Odiff = self.remove_initial_guess(Ohat)
+        residual = self.residual(Odiff)
+        rg = [np.sum((G @ oi) ** 2) for G, oi in zip(self.regularizer, Odiff)]
         return residual + np.array(rg)
