@@ -54,6 +54,15 @@ class _BaseRegularizedSolver(SolverTemplate):
 
     .. math::
         (\D\trp\D + \bfGamma_i\trp\bfGamma_i)\ohat_i = \D\trp\z_i.
+
+    If an initial guess $\Ohat^{(0)}$ is provided, the minimization problem
+    is changed to
+
+    .. math::
+       \argmin_{\ohat_i}
+       \|\D\ohat_i - \z_i\|_2^2
+       + \sum_{i=1}^{r}\|\bfGamma_i(\ohat_i-\ohat_i^{(0)})\|_2^2,
+       \quad i = 1, \ldots, r.
     """
 
     def __init__(self, initial_guess=None):
@@ -69,6 +78,8 @@ class _BaseRegularizedSolver(SolverTemplate):
     # Main methods ------------------------------------------------------------
     def fit(self, data_matrix: np.ndarray, lhs_matrix: np.ndarray):
         r"""Verify dimensions and save the data matrices.
+        If an initial guess was provided during the initialization, we save
+        the residual lhs_matrix-initial_guess^T data_matrix instead.
 
         Parameters
         ----------
@@ -150,11 +161,15 @@ class _BaseRegularizedSolver(SolverTemplate):
         raise NotImplementedError  # pragma: no cover
 
     def add_initial_guess(self, Ohat):
+        """Adds the initial guess if one was provided.
+        Does nothing otherwise."""
         if self.initial_guess is None:
             return Ohat
         return Ohat + self.initial_guess
 
     def remove_initial_guess(self, Ohat):
+        """Subtracts the initial guess if one was provided.
+        Does nothing otherwise."""
         if self.initial_guess is None:
             return Ohat
         return Ohat - self.initial_guess
@@ -280,6 +295,13 @@ class L2Solver(_BaseRegularizedSolver):
     :math:`\bfSigma^{*}` is a diagonal matrix with :math:`i`-th diagonal entry
     :math:`\Sigma_{i,i}^{*} = \Sigma_{i,i}/(\Sigma_{i,i}^{2} + \lambda^2).`
 
+    If an initial guess $\Ohat_0$ is provided, the original minimization
+    problem is changed to
+
+    .. math::
+        \argmin_{\Ohat}\|\D\Ohat\trp - \Z\trp\|_F^2
+        + \|\lambda(\Ohat\trp-\Ohat_0\trp)\|_F^2
+
     Parameters
     ----------
     regularizer : float
@@ -287,6 +309,9 @@ class L2Solver(_BaseRegularizedSolver):
     lapack_driver : str
         LAPACK routine for computing the singular value decomposition.
         See :func:`scipy.linalg.svd()`.
+    initial_guess : np.ndarray or None
+        Initial guess for solving regularization. Defaults to zero
+        if not provided.
     """
 
     def __init__(
@@ -461,11 +486,13 @@ class L2Solver(_BaseRegularizedSolver):
         Specifically, given a potential :math:`\Ohat`, compute
 
         .. math::
-           \|\D\ohat_i - \z_i\|_2^2 + \|\lambda\ohat_i\|_2^2,
+           \|\D\ohat_i - \z_i\|_2^2 + \|\lambda(\ohat_i-\ohat_i^{(0)})\|_2^2,
            \quad i = 1, \ldots, r,
 
         where :math:`\ohat_i` and :math:`\z_i` are the :math:`i`-th rows of
-        :math:`\Ohat` and :math:`\Z`, respectively.
+        :math:`\Ohat` and :math:`\Z`, respectively, and :math:`\ohat_i^{(0)}`
+        are the rows of the initial guess set during initialization.
+        If no initial guess was provided, :math:`\ohat_i^{(0)} = \bf0`
 
         Parameters
         ----------
@@ -554,6 +581,15 @@ class L2DecoupledSolver(L2Solver):
     using the singular value decomposition of the data matrix
     (see :class:`L2Solver`).
 
+    If initial guesses $\Ohat^{(0)}$ is provided, the original minimization
+    problem is changed to
+
+    .. math::
+        \argmin_{\Ohat}\|\D\ohat_i - \z_i\|_2^2
+        + \|\lambda_i(\ohat_i-\ohat_i^{(0)})\|_2^2
+
+    where $\ohat_i^{(0)}$ are the rows of $\Ohat^{(0)}$.
+
     Parameters
     ----------
     regularizer : (r,) ndarray
@@ -562,6 +598,9 @@ class L2DecoupledSolver(L2Solver):
     lapack_driver : str
         LAPACK routine for computing the singular value decomposition.
         See :func:`scipy.linalg.svd()`.
+    initial_guess : np.ndarray or None
+        Initial guess for solving regularization. Defaults to zero
+        if not provided.
     """
 
     # Properties --------------------------------------------------------------
@@ -686,12 +725,15 @@ class L2DecoupledSolver(L2Solver):
         Specifically, given a potential :math:`\Ohat`, compute
 
         .. math::
-           \|\D\ohat_i - \z_i\|_2^2 + \|\lambda_i\ohat_i\|_2^2,
+           \|\D\ohat_i - \z_i\|_2^2 + \|\lambda_i(\ohat_i-\ohat_i^{(0)})\|_2^2,
            \quad i = 1, \ldots, r,
 
         where :math:`\ohat_i` and :math:`\z_i` are the :math:`i`-th rows of
         :math:`\Ohat` and :math:`\Z`, respectively, and :math:`\lambda_i \ge 0`
         is the corresponding regularization constant.
+        If an initial guess was provided during initialization,
+        :math:`\ohat_i^{(0)}` are the rows of the initial guess. Otherwise
+        :math:`\ohat_i^{(0)} = \bf0`.
 
         Parameters
         ----------
@@ -736,6 +778,13 @@ class TikhonovSolver(_BaseRegularizedSolver):
     .. math::
        \Ohat = \Z\D(\D\trp\D + \bfGamma\trp\bfGamma)^{-\mathsf{T}}.
 
+    If initial guesses $\Ohat_0$ is provided, the original minimization
+    problem is changed to
+
+    .. math::
+        \argmin_\Ohat\|\D\Ohat\trp - \Z\trp\|_F^2
+        + \|\bfGamma(\Ohat\trp-\Ohat_0\trp)\|_F^2
+
     Parameters
     ----------
     regularizer : (d, d) or (d,) ndarray
@@ -760,6 +809,9 @@ class TikhonovSolver(_BaseRegularizedSolver):
     lapack_driver : str or None
         Which LAPACK driver is used to solve the least-squares problem,
         see :func:`scipy.linalg.lstsq()`. Ignored if ``method = "normal"``.
+    initial_guess : np.ndarray or None
+        Initial guess for solving regularization. Defaults to zero
+        if not provided.
     """
 
     def __init__(
@@ -1084,11 +1136,13 @@ class TikhonovSolver(_BaseRegularizedSolver):
         Specifically, given a potential :math:`\Ohat`, compute
 
         .. math::
-           \|\D\ohat_i - \z_i\|_2^2 + \|\bfGamma\ohat_i\|_2^2,
+           \|\D\ohat_i - \z_i\|_2^2 + \|\bfGamma(\ohat_i-\ohat_i^{(0)})\|_2^2,
            \quad i = 1, \ldots, r,
 
         where :math:`\ohat_i` and :math:`\z_i` are the :math:`i`-th rows of
         :math:`\Ohat` and :math:`\Z`, respectively.
+        The :math:`\ohat_i^{(0)}` are the rows of the initial guess provided
+        during the initialization (defaulted to zero).
 
         Parameters
         ----------
@@ -1184,6 +1238,13 @@ class TikhonovDecoupledSolver(TikhonovSolver):
     .. math::
        (\D\trp\D + \bfGamma_i\trp\bfGamma_i)\ohat_i = \D\trp\z_i.
 
+    If initial guesses $\Ohat_0$ is provided, the original minimization
+    problem is changed to
+
+    .. math::
+        \argmin_\Ohat\|\D\Ohat\trp - \Z\trp\|_F^2
+        + \|\bfGamma(\Ohat\trp-\Ohat_0\trp)\|_F^2
+
     Parameters
     ----------
     regularizer : list of r (d, d) or (d,) ndarrays
@@ -1209,6 +1270,9 @@ class TikhonovDecoupledSolver(TikhonovSolver):
     lapack_driver : str or None
         Which LAPACK driver is used to solve the least-squares problem,
         see :func:`scipy.linalg.lstsq()`. Ignored if ``method = "normal"``.
+    initial_guess : np.ndarray or None
+        Initial guess for solving regularization. Defaults to zero
+        if not provided.
     """
 
     # Properties --------------------------------------------------------------
@@ -1356,12 +1420,15 @@ class TikhonovDecoupledSolver(TikhonovSolver):
         Specifically, given a potential :math:`\Ohat`, compute
 
         .. math::
-           \|\D\ohat_i - \z_i\|_2^2 + \|\bfGamma_i\ohat_i\|_2^2,
+           \|\D\ohat_i - \z_i\|_2^2
+           + \|\bfGamma_i(\ohat_i-\ohat_i^{(0)})\|_2^2,
            \quad i = 1, \ldots, r,
 
         where :math:`\ohat_i` and :math:`\z_i` are the :math:`i`-th rows of
         :math:`\Ohat` and :math:`\Z`, respectively, and :math:`\bfGamma_i` is
         the corresponding symmetric-positive-definite regularization matrix.
+        The :math:`\ohat_i^{(0)}` are the rows of the initial guess provided
+        during the initialization (defaulted to zero).
 
         Parameters
         ----------
