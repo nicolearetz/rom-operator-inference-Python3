@@ -55,8 +55,8 @@ class _BaseRegularizedSolver(SolverTemplate):
     .. math::
         (\D\trp\D + \bfGamma_i\trp\bfGamma_i)\ohat_i = \D\trp\z_i.
 
-    If an initial guess $\Ohat^{(0)}$ is provided, the minimization problem
-    is changed to
+    If an initial guess :math:`\Ohat^{(0)}` is provided, the minimization
+    problem is changed to
 
     .. math::
        \argmin_{\ohat_i}
@@ -295,7 +295,7 @@ class L2Solver(_BaseRegularizedSolver):
     :math:`\bfSigma^{*}` is a diagonal matrix with :math:`i`-th diagonal entry
     :math:`\Sigma_{i,i}^{*} = \Sigma_{i,i}/(\Sigma_{i,i}^{2} + \lambda^2).`
 
-    If an initial guess $\Ohat_0$ is provided, the original minimization
+    If an initial guess :math:`\Ohat_0` is provided, the original minimization
     problem is changed to
 
     .. math::
@@ -581,14 +581,14 @@ class L2DecoupledSolver(L2Solver):
     using the singular value decomposition of the data matrix
     (see :class:`L2Solver`).
 
-    If initial guesses $\Ohat^{(0)}$ is provided, the original minimization
-    problem is changed to
+    If initial guesses :math:`\Ohat^{(0)}` is provided, the original
+    minimization problem is changed to
 
     .. math::
         \argmin_{\Ohat}\|\D\ohat_i - \z_i\|_2^2
         + \|\lambda_i(\ohat_i-\ohat_i^{(0)})\|_2^2
 
-    where $\ohat_i^{(0)}$ are the rows of $\Ohat^{(0)}$.
+    where :math:`\ohat_i^{(0)}` are the rows of :math:`\Ohat^{(0)}`.
 
     Parameters
     ----------
@@ -778,7 +778,7 @@ class TikhonovSolver(_BaseRegularizedSolver):
     .. math::
        \Ohat = \Z\D(\D\trp\D + \bfGamma\trp\bfGamma)^{-\mathsf{T}}.
 
-    If initial guesses $\Ohat_0$ is provided, the original minimization
+    If initial guesses :math:`\Ohat_0` is provided, the original minimization
     problem is changed to
 
     .. math::
@@ -1238,7 +1238,7 @@ class TikhonovDecoupledSolver(TikhonovSolver):
     .. math::
        (\D\trp\D + \bfGamma_i\trp\bfGamma_i)\ohat_i = \D\trp\z_i.
 
-    If initial guesses $\Ohat_0$ is provided, the original minimization
+    If initial guesses :math:`\Ohat_0` is provided, the original minimization
     problem is changed to
 
     .. math::
