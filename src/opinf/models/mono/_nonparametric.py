@@ -267,8 +267,7 @@ class _NonparametricModel(_OpInfModel):
             return self
 
         # Execute non-intrusive learning.
-        self._Ohat = self.solver.solve()
-        self._extract_operators(Ohat=self._Ohat)
+        self._extract_operators(Ohat=self.solver.solve())
 
         return self
 
