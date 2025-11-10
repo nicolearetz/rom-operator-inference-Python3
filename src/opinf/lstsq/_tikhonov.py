@@ -160,14 +160,14 @@ class _BaseRegularizedSolver(SolverTemplate):
         """Compute the residual of the regularized regression problem."""
         raise NotImplementedError  # pragma: no cover
 
-    def add_initial_guess(self, Ohat):
+    def _add_initial_guess(self, Ohat):
         """Adds the initial guess if one was provided.
         Does nothing otherwise."""
         if self.initial_guess is None:
             return Ohat
         return Ohat + self.initial_guess
 
-    def remove_initial_guess(self, Ohat):
+    def _subtract_initial_guess(self, Ohat):
         """Subtracts the initial guess if one was provided.
         Does nothing otherwise."""
         if self.initial_guess is None:
