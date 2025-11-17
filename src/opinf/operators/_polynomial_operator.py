@@ -505,13 +505,15 @@ class PolynomialOperator(OpInfOperator):
             target reduced dimension (trial space). Needs to be at
             least as large as ``self.state_dimension``
         indices_trial : list of integers
-            indices of the (trial) basis vectors onto which the operator
-            shall be restricted. Needs to be in increasing order and
+            indices of the (trial) basis vectors to which the previous
+            operator entries shall be mapped in the expanded basis.
+            Needs to be in increasing order and
             not contain dubplicates.
         indices_test : list of integers
-            indices of the (test) basis vectors onto which the operator
-            shall be restricted in the Petrov-Galerkin setting in
-            increasing order. Needs to be in increasing order and
+            indices of the (test) basis vectors onto which the
+            previous operator entries shall be mapped in the
+            expanded basis (Petrov-Galerkin setting only).
+            Needs to be in increasing order and
             not contain dubplicates.
         new_r_test : int
             target reduced dimension (test space). Defaulted to
@@ -540,7 +542,7 @@ class PolynomialOperator(OpInfOperator):
                 """
             )
 
-        new_entries = PolynomialOperator.extend_matrix_to_dimension(
+        new_entries = PolynomialOperator._extend_matrix_to_dimension(
             new_r=new_r,
             indices_trial=indices_trial,
             polynomial_order=self.polynomial_order,
@@ -554,7 +556,7 @@ class PolynomialOperator(OpInfOperator):
         )
 
     @staticmethod
-    def extend_matrix_to_dimension(
+    def _extend_matrix_to_dimension(
         new_r,
         indices_trial,
         polynomial_order,
@@ -562,7 +564,60 @@ class PolynomialOperator(OpInfOperator):
         indices_test=None,
         new_r_test=None,
     ):
-        """ """
+        r"""
+        This is the reverse function to _restrict_marix_to_dimension.
+
+        Treating the matrix ``old_entries`` as operator matrix for the
+        polynomial order ``polynomial_order``, this function creates
+        a larger matrix of shape ``(new_r_test, a)`` with
+        :math:`a=r_{new}^{(p)}` the number of non-redundant entries
+        in the :math:`p=` ``polynomial-oder``-fold Kronecker product
+        of an :math:`r_{new}=` ``new_r`` dimensional vector.
+        The new matrix constains ``old_entries`` as the submatrix
+        encoding operator actions for trial and test basis vectors
+        with indices in ``indices_trial`` and ``indices_test``.
+        All remaining entries are set to zero.
+
+        Defaults to ``indices_test=indices_trial`` if
+        ``indices_test = None``.
+
+        Parameters
+        ----------
+        new_r : int
+            target reduced dimension (trial space). Needs to be at
+            least as large as ``self.state_dimension``
+        indices_trial : list of integers
+            indices of the (trial) basis vectors to which the previous
+            operator entries shall be mapped in the expanded basis.
+            Needs to be in increasing order and
+            not contain dubplicates.
+        polynomial_order : int
+            polynomial order of the operator matrix to be extracted
+        old_entries : np.ndarray
+            operator entry matrix of shape ``(a, b)`` with
+            :math:`a =` ``len(indices_test)`` and
+            :math:`b \ge r^{(p)}` where :math:`r=` ``len(indices_trial)``
+            and :math:`r^{(p)}` is the number of non-redundant entries for
+            a polynomial operator of order :math:`p` and dimension :math:`r`.
+        indices_test : list of integers
+            indices of the (test) basis vectors onto which the
+            previous operator entries shall be mapped in the
+            expanded basis (Petrov-Galerkin setting only).
+            Needs to be in increasing order and
+            not contain dubplicates.
+        new_r_test : int
+            target reduced dimension (test space). Defaulted to
+            ``new_r`` if not provided.
+
+        Returns
+        -------
+        new_matrix : np.ndarray
+            of shape ``(new_r_test, c)``, where `c` is the
+            number of non-redundant entries for the condensed
+            Kronecker product of a vector with dimension
+            ``new_r`` for polynomial order ``polynomial_order``.
+            Contains `old_entries` as submatrix.
+        """
         if indices_test is None:
             indices_test = indices_trial
 
