@@ -280,7 +280,38 @@ class PolynomialOperator(OpInfOperator):
         )
 
     def restrict_to_subspace(self, indices_trial, indices_test=None):
+        r"""
+        Creates a new operator of type `PolynomialOperator` of the same
+        polynomial order as this one but for the reduced (trial) dimension
+        :math:`r_1 :=` ``len(indices)`` and (test) dimension
+        ``len(indices_test)`` (Petrov-Galerkin setting). The new operator
+        is constructed by restricting the action of this operator (``self``)
+        onto :math:`span{\mathbf{v}_i: i \in indices_trial}`, and testing
+        in :math:`span{\mathbf{v}_i: i \in indices_test}`.
 
+        If ``indices_test``
+        is not provided, defaults to the Galerkin setting
+        ``indices_test = indices_trial``.
+
+        Currently, the more general restriction onto combinations of
+        basis vectors (e.g., onto :math:`span{(v_1+v_2)/2}`) is not supported.
+
+        Parameters
+        ----------
+        indices_trial : list of integers
+            indices of the (trial) basis vectors onto which the operator
+            shall be restricted. Needs to be in increasing order and
+            not contain dubplicates.
+        indices_test : list of integers
+            indices of the (test) basis vectors onto which the operator
+            shall be restricted in the Petrov-Galerkin setting in
+            increasing order. Needs to be in increasing order and
+            not contain dubplicates.
+
+        Returns
+        -------
+        PolynomialOperator
+        """
         if indices_test is None:
             indices_test = indices_trial
 
@@ -317,11 +348,62 @@ class PolynomialOperator(OpInfOperator):
     def restrict_matrix_to_subspace(
         indices_trial, entries, polynomial_order, indices_test=None
     ):
+        r"""
+        Treating the matrix `entries` as operator matrix for the
+        polynomial order `polynomial_order`, this function creates
+        a submatrix `entries_sub` by restricting `entries` onto
+        those columns that correspond to interactions of basis
+        vectors :math:`v_i` with :math:`i \in` ``indices_trial``
+        and to the rows listed in `indices_test`.
+
+        Defaults to ``indices_test=indices_trial`` if
+        ``indices_test = None``.
+
+        Parameters
+        ----------
+        indices_trial : list of integers
+            indices of the (trial) basis vectors onto which the operator
+            shall be restricted. Needs to be in increasing order and
+            not contain dubplicates.
+        entries : np.ndarray
+            operator entry matrix of shape :math:`(a,b)` with
+            :math:`a \ge ` ``len(indices_test)`` and
+            :math:`b \ge r^{(p)}` where :math:`r=` ``len(indices_trial)``
+            and :math:`r^{(p)}` is the number of non-redundant entries for
+            a polynomial operator of order :math:`p` and dimension :math:`r`.
+        polynomial_order : int
+            polynomial order of the operator matrix to be extracted
+        indices_test : list of integers
+            indices of the (test) basis vectors onto which the operator
+            shall be restricted in the Petrov-Galerkin setting in
+            increasing order. Needs to be in increasing order and
+            not contain dubplicates.
+
+        Returns
+        -------
+        entries_sub : np.ndarray
+            of shape ``(len(indices_test), c)``, where `c` is the
+            number of non-redundant entries for the condensed
+            Kronecker product of a vector with dimension
+            ``len(indices_trial)``.
         """
-        - not checking for duplicate indices
-        """
+        if len(indices_trial) != len(set(indices_trial)):
+            raise RuntimeError(
+                f"""
+                In PolynomialOperator.restrict_matrix_to_subspace:
+                Received duplicate entries in
+                `indices_trial=`{indices_trial}"""
+            )
+
         if indices_test is None:
             indices_test = indices_trial
+        elif len(indices_test) != len(set(indices_test)):
+            raise RuntimeError(
+                f"""
+                In PolynomialOperator.restrict_matrix_to_subspace:
+                Received duplicate entries in
+                `indices_test=`{indices_test}"""
+            )
 
         if indices_trial != sorted(indices_trial) or indices_test != sorted(
             indices_test
