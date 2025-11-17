@@ -418,7 +418,7 @@ class L2Solver(_BaseRegularizedSolver):
         svals = self._svals.reshape((-1, 1))
         svals_inv = svals / (svals**2 + self.regularizer**2)
         Odiff = (self._ZPhi * svals_inv.T) @ self._PsiT
-        return self.add_initial_guess(Odiff)
+        return self._add_initial_guess(Odiff)
 
     def posterior(self):
         r"""Solve the Bayesian operator inference regression, constructing the
@@ -518,7 +518,7 @@ class L2Solver(_BaseRegularizedSolver):
         """
         if self.regularizer is None:
             raise AttributeError("solver regularizer not set")
-        Odiff = self.remove_initial_guess(Ohat)
+        Odiff = self._subtract_initial_guess(Ohat)
         residual = self.residual(Odiff)
         return residual + (self.regularizer**2 * np.sum(Odiff**2, axis=-1))
 
@@ -1075,7 +1075,7 @@ class TikhonovSolver(_BaseRegularizedSolver):
         elif self.method == "normal":
             regD = self._DtD + (self.regularizer.T @ self.regularizer)
             Ohat = la.solve(regD, self._DtZt, assume_a="pos").T
-        return self.add_initial_guess(Ohat)
+        return self._add_initial_guess(Ohat)
 
     def posterior(self):
         r"""Solve the Bayesian operator inference regression, constructing the
@@ -1168,7 +1168,7 @@ class TikhonovSolver(_BaseRegularizedSolver):
         """
         if self.regularizer is None:
             raise AttributeError("solver regularizer not set")
-        Odiff = self.remove_initial_guess(Ohat)
+        Odiff = self._subtract_initial_guess(Ohat)
         residual = self.residual(Odiff)
         return residual + np.sum((self.regularizer @ Odiff.T) ** 2, axis=0)
 
@@ -1352,7 +1352,7 @@ class TikhonovDecoupledSolver(TikhonovSolver):
             elif self.method == "normal":
                 regD = self._DtD + Gamma.T @ Gamma
                 Ohat[i] = la.solve(regD, self._DtZt[:, i], assume_a="pos")
-        return self.add_initial_guess(Ohat)
+        return self._add_initial_guess(Ohat)
 
     def posterior(self):
         r"""Solve the Bayesian operator inference regression, constructing the
@@ -1454,7 +1454,7 @@ class TikhonovDecoupledSolver(TikhonovSolver):
         """
         if self.regularizer is None:
             raise AttributeError("solver regularizer not set")
-        Odiff = self.remove_initial_guess(Ohat)
+        Odiff = self._subtract_initial_guess(Ohat)
         residual = self.residual(Odiff)
         rg = [np.sum((G @ oi) ** 2) for G, oi in zip(self.regularizer, Odiff)]
         return residual + np.array(rg)
