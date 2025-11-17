@@ -810,7 +810,7 @@ class AffinePolynomialOperator(_AffineOperator):
         - not checking for duplicate indices
         """
         new_entries = [
-            PolynomialOperator.restrict_matrix_to_subspace(
+            PolynomialOperator._restrict_matrix_to_subspace(
                 indices_trial=indices_trial,
                 indices_test=indices_test,
                 entries=self.entries[i],
@@ -836,7 +836,7 @@ class AffinePolynomialOperator(_AffineOperator):
             indices_trial = [*range(self.state_dimension)]
 
         new_entries = [
-            PolynomialOperator.extend_matrix_to_dimension(
+            PolynomialOperator._extend_matrix_to_dimension(
                 new_r=new_r,
                 indices_trial=indices_trial,
                 indices_test=indices_test,

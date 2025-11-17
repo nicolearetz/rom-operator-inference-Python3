@@ -173,7 +173,7 @@ def test_restrict_to_subspace(r):
     small_matrix = large_matrix[indices_test, 0]
     assert np.isclose(
         small_matrix,
-        PolynomialOperator.restrict_matrix_to_subspace(
+        PolynomialOperator._restrict_matrix_to_subspace(
             indices_trial=indices_trial,
             indices_test=indices_test,
             entries=large_matrix,
@@ -205,7 +205,7 @@ def test_restrict_to_subspace(r):
     small_matrix = large_matrix[indices_test, :][:, indices_trial]
     assert np.isclose(
         small_matrix,
-        PolynomialOperator.restrict_matrix_to_subspace(
+        PolynomialOperator._restrict_matrix_to_subspace(
             indices_trial=indices_trial,
             indices_test=indices_test,
             entries=large_matrix,
@@ -244,7 +244,7 @@ def test_restrict_to_subspace(r):
     small_matrix = large_matrix[indices_test, :][:, [0, 3, 5]]
     assert np.isclose(
         small_matrix,
-        PolynomialOperator.restrict_matrix_to_subspace(
+        PolynomialOperator._restrict_matrix_to_subspace(
             indices_trial=indices_trial,
             indices_test=indices_test,
             entries=large_matrix,
@@ -283,7 +283,7 @@ def test_restrict_to_subspace(r):
     small_matrix = large_matrix[indices_test, :][:, [0, 4, 7, 9]]
     assert np.isclose(
         small_matrix,
-        PolynomialOperator.restrict_matrix_to_subspace(
+        PolynomialOperator._restrict_matrix_to_subspace(
             indices_trial=indices_trial,
             indices_test=indices_test,
             entries=large_matrix,
@@ -352,14 +352,14 @@ def test_extend_dimension(r_large, r_small, p):
     )
     assert (matrix_original == operator_condensed.entries).all()
 
-    matrix_extended = PolynomialOperator.extend_matrix_to_dimension(
+    matrix_extended = PolynomialOperator._extend_matrix_to_dimension(
         indices_test=indices_test,
         indices_trial=indices_trial,
         new_r=r_large,
         polynomial_order=p,
         old_entries=matrix_original,
     )
-    matrix_condensed = PolynomialOperator.restrict_matrix_to_subspace(
+    matrix_condensed = PolynomialOperator._restrict_matrix_to_subspace(
         indices_test=indices_test,
         indices_trial=indices_trial,
         polynomial_order=p,

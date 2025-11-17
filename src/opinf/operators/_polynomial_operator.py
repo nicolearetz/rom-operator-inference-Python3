@@ -413,7 +413,7 @@ class PolynomialOperator(OpInfOperator):
         ):
             raise RuntimeError(
                 f"""
-        In PolynomialOperator.extend_matrix_to_dimension: Received unordered
+        In PolynomialOperator._extend_matrix_to_dimension: Received unordered
         indices {indices_trial} (trial) or {indices_test} (test).
         """
             )
@@ -428,7 +428,7 @@ class PolynomialOperator(OpInfOperator):
         entries_sub = entries[indices_test, :]
         # restrict to test indices only
 
-        col_indices = PolynomialOperator.columnIndices_p(
+        col_indices = PolynomialOperator._columnIndices_p(
             indices=indices_trial, p=polynomial_order
         )
         # find out which columns to keep
@@ -456,7 +456,7 @@ class PolynomialOperator(OpInfOperator):
         if p == 0:
             return [0]
 
-        sub = PolynomialOperator.columnIndices_p(indices, p - 1)
+        sub = PolynomialOperator._columnIndices_p(indices, p - 1)
         return [
             comb(indices[i], p, repetition=True, exact=True) + sub[j]
             for i in range(len(indices))
@@ -629,7 +629,7 @@ class PolynomialOperator(OpInfOperator):
         ):
             raise RuntimeError(
                 f"""
-                In PolynomialOperator.extend_matrix_to_dimension:
+                In PolynomialOperator._extend_matrix_to_dimension:
                 Received unordered indices
                 {indices_trial} (trial) or {indices_test} (test).
                 """
@@ -643,7 +643,7 @@ class PolynomialOperator(OpInfOperator):
             ),
         ):
             raise RuntimeError(
-                f"""In PolynomialOperator.extend_matrix_to_dimension:
+                f"""In PolynomialOperator._extend_matrix_to_dimension:
                 Mismatch in the dimension of the passed matrix.
                 Expected {
                     (len(indices_test),
@@ -656,7 +656,7 @@ class PolynomialOperator(OpInfOperator):
         if old_r > new_r:
             raise RuntimeError(
                 f"""In PolynomialOperator.
-                               extend_matrix_to_dimension:
+                               _extend_matrix_to_dimension:
                                Mismatch in passed indices:
                                Old dimension {old_r} is larger
                                than new dimension {new_r}
@@ -666,7 +666,7 @@ class PolynomialOperator(OpInfOperator):
         if len(indices_test) > new_r_test:
             raise RuntimeError(
                 f"""In PolynomialOperator.
-                extend_matrix_to_dimension:
+                _extend_matrix_to_dimension:
                                Mismatch in passed indices for test space:
                                Old dimension {len(indices_test)} is
                                larger than new test dimension {new_r_test}
@@ -684,7 +684,7 @@ class PolynomialOperator(OpInfOperator):
         )
 
         # populate columns
-        col_indices = PolynomialOperator.columnIndices_p(
+        col_indices = PolynomialOperator._columnIndices_p(
             indices=indices_trial, p=polynomial_order
         )
         new_marix_sub[:, col_indices] = old_entries

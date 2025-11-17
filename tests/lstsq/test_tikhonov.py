@@ -898,7 +898,7 @@ class TestTikhonovDecoupledSolver(_TestBaseRegularizedSolver):
     "n_cols, n_dofs, n_red",
     [
         (n_cols, n_dofs, n_red)
-        for n_cols in [20, 50, 100, 1000]
+        for n_cols in [1, 20, 50, 100, 1000]
         for n_dofs in [1, 2, 5, 10, 20]
         for n_red in range(1, 5)
     ],
