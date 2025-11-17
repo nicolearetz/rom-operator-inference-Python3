@@ -311,6 +311,9 @@ class PolynomialOperator(OpInfOperator):
         Returns
         -------
         PolynomialOperator
+            Operator for trial dimension ``len(indices_trial)``, test
+            dimension ``len(indices_test)``, and polynomial order
+            ``self.polynomial_order``.
         """
         if indices_test is None:
             indices_test = indices_trial
@@ -467,7 +470,60 @@ class PolynomialOperator(OpInfOperator):
     def extend_to_dimension(
         self, new_r, indices_trial=None, indices_test=None, new_r_test=None
     ):
-        """ """
+        r"""
+        Creates a new operator of type `PolynomialOperator` of the same
+        polynomial order as this one but for the reduced (trial) dimension
+        ``new_r`` and (test) dimension ``new_r_test`` (defaulted to
+        ``new_r_test = new_r`` if not provided). The new operator is
+        created by mapping the current (trial) basis vector
+        :math:`\mathbf{v}_i`
+        onto the basis vector :math:`\tilde{\mathbf{v}}_j`,
+        :math:`j=` ``indices_trial[i]`` of the new basis, :math`i=1, ..., r`.
+        Similarly, the current test basis vectors :math:`\mathbf{w}_i` are
+        mapped onto the new test vectors :math:`\tilde{\mathbf{w}}_j`,
+        :math:`j=` ``indices_test[i]`` of the new basis, :math`i=1, ..., r`.
+        The remaining actions of the new operator (i.e., all actions that
+        involve :math:`\tilde{\mathbf{v}}_j` with
+        :math:`j\notin` ``indices_trial`` or :math:`\tilde{\mathbf{w}}_j`
+        with :math:`j\notin` ``indices_test``) are defaulted to 0.
+
+        If ``indices_trial`` is not provided, it is assumed that the
+        current basis is expanded and the current basis vectors are
+        to be mapped onto the first :math:`r` basis vectors of the
+        new basis, i.e., we default to ``indices_trial = [0, ..., r-1]``.
+
+        If ``indices_test``
+        is not provided, defaults to the Galerkin setting
+        ``indices_test = indices_trial``.
+
+        Currently, the more general restriction onto combinations of
+        basis vectors (e.g., onto :math:`span{(v_1+v_2)/2}`) is not supported.
+
+        Parameters
+        ----------
+        new_r : int
+            target reduced dimension (trial space). Needs to be at
+            least as large as ``self.state_dimension``
+        indices_trial : list of integers
+            indices of the (trial) basis vectors onto which the operator
+            shall be restricted. Needs to be in increasing order and
+            not contain dubplicates.
+        indices_test : list of integers
+            indices of the (test) basis vectors onto which the operator
+            shall be restricted in the Petrov-Galerkin setting in
+            increasing order. Needs to be in increasing order and
+            not contain dubplicates.
+        new_r_test : int
+            target reduced dimension (test space). Defaulted to
+            ``new_r`` if not provided.
+
+        Returns
+        -------
+        PolynomialOperator
+            Operator for trial dimension ``new_r``, test
+            dimension ``new_r_test``, and polynomial order
+            ``self.polynomial_order``.
+        """
         if indices_trial is None:
             # default to extending the basis towards the right
             indices_trial = [*range(self.state_dimension)]
