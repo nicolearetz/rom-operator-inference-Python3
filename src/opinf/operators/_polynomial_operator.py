@@ -333,7 +333,7 @@ class PolynomialOperator(OpInfOperator):
                                Reduced dimension is {self.state_dimension}"""
             )
 
-        new_entries = PolynomialOperator.restrict_matrix_to_subspace(
+        new_entries = PolynomialOperator._restrict_matrix_to_subspace(
             indices_trial=indices_trial,
             entries=self.entries,
             polynomial_order=self.polynomial_order,
@@ -345,7 +345,7 @@ class PolynomialOperator(OpInfOperator):
         )
 
     @staticmethod
-    def restrict_matrix_to_subspace(
+    def _restrict_matrix_to_subspace(
         indices_trial, entries, polynomial_order, indices_test=None
     ):
         r"""
@@ -433,7 +433,20 @@ class PolynomialOperator(OpInfOperator):
         return entries_sub[:, col_indices]
 
     @staticmethod
-    def columnIndices_p(indices, p):
+    def _columnIndices_p(indices, p):
+        r"""
+        Identifies all (column) indices of a polynomial operator
+        of polynomial order :math:`p` that encode interactions
+        of basis vectors :math:`v_i` with :math:`i\in` ``indices``.
+
+        Parameters
+        ----------
+        indices : list of integers
+            indices of the basis vectors for which interactions
+            shall be identified
+        p : int
+            polynomial order of the interactions
+        """
         if p == 1:
             return indices
 
