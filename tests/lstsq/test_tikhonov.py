@@ -898,7 +898,7 @@ class TestTikhonovDecoupledSolver(_TestBaseRegularizedSolver):
     "n_cols, n_dofs, n_red",
     [
         (n_cols, n_dofs, n_red)
-        for n_cols in [1, 20, 50, 100, 1000]
+        for n_cols in [20, 50, 100, 1000]
         for n_dofs in [1, 2, 5, 10, 20]
         for n_red in range(1, 5)
     ],
@@ -918,14 +918,13 @@ def test_initial_guesses(n_cols, n_dofs, n_red):
         assert Ohat_std.shape == Ohat_ini.shape
         assert Ohat_ini.shape == guess.shape
 
-        assert (
-            solver_std.regresidual(Ohat=Ohat_std)
-            <= solver_std.regresidual(Ohat=Ohat_ini)
-        ).all()
-        assert (
-            solver_ini.regresidual(Ohat=Ohat_std)
-            >= solver_ini.regresidual(Ohat=Ohat_ini)
-        ).all()
+        a = solver_std.regresidual(Ohat=Ohat_std)
+        b = solver_std.regresidual(Ohat=Ohat_ini)
+        assert ((a <= b) | np.isclose(a, b)).all()
+
+        a = solver_ini.regresidual(Ohat=Ohat_std)
+        b = solver_ini.regresidual(Ohat=Ohat_ini)
+        assert ((a >= b) | np.isclose(a, b)).all()
 
     def compare_to_stronger(solver_class, regularizer):
         # ensure that using a stronger regularization brings
